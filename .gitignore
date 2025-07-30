@@ -1,0 +1,31 @@
+# Godot files
+.godot/
+*.tmp
+*.import
+export_presets.cfg
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Build files
+build/
+dist/
+
+# Logs
+*.log
+
+# Temporary files
+*~
+*.swp
+*.swo
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates

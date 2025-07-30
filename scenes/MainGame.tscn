@@ -1,0 +1,249 @@
+[gd_scene load_steps=7 format=3 uid="uid://bvkxqy8r1n2ys"]
+
+[ext_resource type="Script" path="res://scripts/MainGameController.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/GameManager.gd" id="1_0k8vx"]
+[ext_resource type="Script" path="res://scripts/LoopManager.gd" id="2_1h5yz"]
+[ext_resource type="Script" path="res://scripts/CardManager.gd" id="3_2i6za"]
+[ext_resource type="Script" path="res://scripts/HeroManager.gd" id="4_3j7ab"]
+[ext_resource type="Script" path="res://scripts/BattleManager.gd" id="5_4k8bc"]
+
+[node name="MainGame" type="Node2D"]
+script = ExtResource("1_main")
+
+[node name="GameManager" type="Node" parent="."]
+script = ExtResource("1_0k8vx")
+
+[node name="LoopManager" type="Node2D" parent="."]
+position = Vector2(640, 360)
+script = ExtResource("2_1h5yz")
+
+[node name="CardManager" type="Node" parent="."]
+script = ExtResource("3_2i6za")
+
+[node name="HeroManager" type="Node" parent="."]
+script = ExtResource("4_3j7ab")
+
+[node name="BattleManager" type="Node" parent="."]
+script = ExtResource("5_4k8bc")
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="GameUI" type="Control" parent="UI"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TopPanel" type="Panel" parent="UI/GameUI"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 80.0
+grow_horizontal = 2
+
+[node name="ResourcesContainer" type="HBoxContainer" parent="UI/GameUI/TopPanel"]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 20.0
+offset_top = -20.0
+offset_right = 400.0
+offset_bottom = 20.0
+grow_vertical = 2
+
+[node name="WoodLabel" type="Label" parent="UI/GameUI/TopPanel/ResourcesContainer"]
+layout_mode = 2
+text = "木材: 0"
+
+[node name="StoneLabel" type="Label" parent="UI/GameUI/TopPanel/ResourcesContainer"]
+layout_mode = 2
+text = "石头: 0"
+
+[node name="MetalLabel" type="Label" parent="UI/GameUI/TopPanel/ResourcesContainer"]
+layout_mode = 2
+text = "金属: 0"
+
+[node name="FoodLabel" type="Label" parent="UI/GameUI/TopPanel/ResourcesContainer"]
+layout_mode = 2
+text = "食物: 0"
+
+[node name="GameInfoContainer" type="VBoxContainer" parent="UI/GameUI/TopPanel"]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -30.0
+offset_right = -20.0
+offset_bottom = 30.0
+grow_horizontal = 0
+grow_vertical = 2
+
+[node name="LoopLabel" type="Label" parent="UI/GameUI/TopPanel/GameInfoContainer"]
+layout_mode = 2
+text = "循环: 1"
+horizontal_alignment = 2
+
+[node name="StateLabel" type="Label" parent="UI/GameUI/TopPanel/GameInfoContainer"]
+layout_mode = 2
+text = "状态: 准备中"
+horizontal_alignment = 2
+
+[node name="BottomPanel" type="Panel" parent="UI/GameUI"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -150.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="HandContainer" type="HBoxContainer" parent="UI/GameUI/BottomPanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -50.0
+offset_right = 300.0
+offset_bottom = 50.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ControlButtons" type="HBoxContainer" parent="UI/GameUI/BottomPanel"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -200.0
+offset_top = -40.0
+offset_right = -20.0
+offset_bottom = -10.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="StartButton" type="Button" parent="UI/GameUI/BottomPanel/ControlButtons"]
+layout_mode = 2
+text = "开始循环"
+
+[node name="RetreatButton" type="Button" parent="UI/GameUI/BottomPanel/ControlButtons"]
+layout_mode = 2
+text = "撤退"
+
+[node name="PauseButton" type="Button" parent="UI/GameUI/BottomPanel/ControlButtons"]
+layout_mode = 2
+text = "暂停"
+
+[node name="LeftPanel" type="Panel" parent="UI/GameUI"]
+layout_mode = 1
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_right = 250.0
+offset_top = 80.0
+offset_bottom = -150.0
+grow_vertical = 2
+
+[node name="HeroInfo" type="VBoxContainer" parent="UI/GameUI/LeftPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="HeroTitle" type="Label" parent="UI/GameUI/LeftPanel/HeroInfo"]
+layout_mode = 2
+text = "英雄信息"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="UI/GameUI/LeftPanel/HeroInfo"]
+layout_mode = 2
+
+[node name="LevelLabel" type="Label" parent="UI/GameUI/LeftPanel/HeroInfo"]
+layout_mode = 2
+text = "等级: 1"
+
+[node name="HPLabel" type="Label" parent="UI/GameUI/LeftPanel/HeroInfo"]
+layout_mode = 2
+text = "生命值: 100/100"
+
+[node name="AttackLabel" type="Label" parent="UI/GameUI/LeftPanel/HeroInfo"]
+layout_mode = 2
+text = "攻击力: 10"
+
+[node name="DefenseLabel" type="Label" parent="UI/GameUI/LeftPanel/HeroInfo"]
+layout_mode = 2
+text = "防御力: 5"
+
+[node name="ExpLabel" type="Label" parent="UI/GameUI/LeftPanel/HeroInfo"]
+layout_mode = 2
+text = "经验: 0/100"
+
+[node name="RightPanel" type="Panel" parent="UI/GameUI"]
+layout_mode = 1
+anchors_preset = 11
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -250.0
+offset_top = 80.0
+offset_bottom = -150.0
+grow_horizontal = 0
+grow_vertical = 2
+
+[node name="BattleLog" type="VBoxContainer" parent="UI/GameUI/RightPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BattleTitle" type="Label" parent="UI/GameUI/RightPanel/BattleLog"]
+layout_mode = 2
+text = "战斗日志"
+horizontal_alignment = 1
+
+[node name="HSeparator2" type="HSeparator" parent="UI/GameUI/RightPanel/BattleLog"]
+layout_mode = 2
+
+[node name="LogScrollContainer" type="ScrollContainer" parent="UI/GameUI/RightPanel/BattleLog"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="LogText" type="RichTextLabel" parent="UI/GameUI/RightPanel/BattleLog/LogScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+bbcode_enabled = true
+text = "等待战斗开始..."
+fit_content = true
+scroll_following = true
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(640, 360)
+zoom = Vector2(0.8, 0.8)
+
+[node name="Background" type="ColorRect" parent="."]
+offset_right = 1280.0
+offset_bottom = 720.0
+color = Color(0.1, 0.1, 0.15, 1)
+z_index = -1
