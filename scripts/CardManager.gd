@@ -174,7 +174,7 @@ func draw_cards(count: int = 1):
 	
 	print("Drew ", drawn, " cards. Hand size: ", player_hand.size())
 
-func can_place_card(card_data: Dictionary, tile_index: int, loop_manager: LoopManager) -> bool:
+func can_place_card(card_data: Dictionary, tile_index: int, loop_manager: Node) -> bool:
 	"""检查是否可以放置卡牌"""
 	# 检查位置是否已有卡牌
 	if loop_manager.get_card_at_tile(tile_index).size() > 0:
@@ -191,7 +191,7 @@ func can_place_card(card_data: Dictionary, tile_index: int, loop_manager: LoopMa
 		_:
 			return false
 
-func place_card(card_index: int, tile_index: int, loop_manager: LoopManager) -> bool:
+func place_card(card_index: int, tile_index: int, loop_manager: Node) -> bool:
 	"""放置卡牌"""
 	if card_index < 0 or card_index >= player_hand.size():
 		print("Invalid card index: ", card_index)
@@ -221,7 +221,7 @@ func place_card(card_index: int, tile_index: int, loop_manager: LoopManager) -> 
 	else:
 		return false
 
-func remove_card_from_tile(tile_index: int, loop_manager: LoopManager) -> Dictionary:
+func remove_card_from_tile(tile_index: int, loop_manager: Node) -> Dictionary:
 	"""从瓦片移除卡牌"""
 	var removed_card = loop_manager.remove_card_at_tile(tile_index)
 	
@@ -295,13 +295,15 @@ func _apply_pass_effects(effects: Dictionary):
 
 func _apply_loop_effects(effects: Dictionary):
 	"""应用循环完成时效果"""
-	if effects.has("food_per_loop"):
-		GameManager.instance.add_resources("food", effects.food_per_loop)
-	
-	if effects.has("resources_per_loop"):
-		for resource_type in effects.resources_per_loop:
-			var amount = effects.resources_per_loop[resource_type]
-			GameManager.instance.add_resources(resource_type, amount)
+	var game_manager = get_node_or_null("/root/GameManager")
+	if game_manager and game_manager.has_method("add_resources"):
+		if effects.has("food_per_loop"):
+			game_manager.add_resources("food", effects.food_per_loop)
+		
+		if effects.has("resources_per_loop"):
+			for resource_type in effects.resources_per_loop:
+				var amount = effects.resources_per_loop[resource_type]
+				game_manager.add_resources(resource_type, amount)
 
 func _apply_battle_effects(effects: Dictionary):
 	"""应用战斗时效果"""

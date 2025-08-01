@@ -24,18 +24,28 @@ var placed_cards: Dictionary = {}  # tile_index -> card_data
 
 # 引用
 var hero_node: Node2D
-var card_manager: CardManager
-var battle_manager: BattleManager
+var card_manager: Node
+var battle_manager: Node
+var tile_map_layer: TileMapLayer
 
 func _ready():
+	# 获取TileMapLayer引用
+	tile_map_layer = get_node("Level1TileMapLayer")
+	
 	# 生成循环路径
 	_generate_loop_path()
+	
+	# 初始化第一关地图
+	_initialize_level1_map()
 	
 	# 连接信号
 	tile_reached.connect(_on_tile_reached)
 	
 	# 初始化英雄位置
 	hero_position = loop_path[0]
+	
+	# 初始绘制
+	queue_redraw()
 	
 	print("Loop Manager initialized with ", TILES_PER_LOOP, " tiles")
 
@@ -51,10 +61,30 @@ func _generate_loop_path():
 	
 	print("Generated loop path with ", loop_path.size(), " positions")
 
+func _initialize_level1_map():
+	"""初始化第一关地图"""
+	if not tile_map_layer:
+		print("Warning: TileMapLayer not found!")
+		return
+	
+	# 创建基础草地背景 (使用瓦片ID 0)
+	for x in range(-10, 11):
+		for y in range(-8, 9):
+			tile_map_layer.set_cell(Vector2i(x, y), 0, Vector2i(0, 0))
+	
+	# 在循环路径上放置路径瓦片 (使用瓦片ID 0，不同的atlas坐标)
+	for i in range(loop_path.size()):
+		var world_pos = loop_path[i]
+		var tile_pos = Vector2i(int(world_pos.x / 32), int(world_pos.y / 32))
+		tile_map_layer.set_cell(tile_pos, 0, Vector2i(1, 0))  # 路径瓦片
+	
+	print("Level 1 map initialized with basic terrain")
+
 func start_hero_movement():
 	"""开始英雄移动"""
 	if not is_moving:
 		is_moving = true
+		queue_redraw()  # 初始绘制
 		_move_to_next_tile()
 
 func stop_hero_movement():
@@ -74,6 +104,15 @@ func _move_to_next_tile():
 	var tween = create_tween()
 	tween.tween_property(self, "hero_position", target_position, MOVE_SPEED / 100.0)
 	tween.tween_callback(_on_movement_completed)
+	
+	# 在补间动画过程中持续重绘
+	tween.tween_callback(queue_redraw).set_delay(0.1)
+	tween.parallel().tween_callback(queue_redraw).set_delay(0.2)
+	tween.parallel().tween_callback(queue_redraw).set_delay(0.3)
+	tween.parallel().tween_callback(queue_redraw).set_delay(0.4)
+	
+	# 触发重绘以显示移动
+	queue_redraw()
 	
 	hero_moved.emit(target_position)
 
@@ -142,8 +181,9 @@ func _check_for_battle():
 	"""检查是否需要触发随机战斗"""
 	# 基础战斗概率（可以根据循环次数调整）
 	var battle_chance = 0.3
-	if GameManager.instance:
-		battle_chance += GameManager.instance.loop_number * 0.1
+	var game_manager = get_node_or_null("/root/GameManager")
+	if game_manager and game_manager.has_method("get_loop_number"):
+		battle_chance += game_manager.get_loop_number() * 0.1
 	
 	if randf() < battle_chance:
 		# 生成随机敌人
@@ -206,7 +246,9 @@ func on_battle_ended(victory: bool):
 		print("Battle won! Continuing movement...")
 	else:
 		print("Battle lost! Hero died...")
-		GameManager.instance.hero_death()
+		var game_manager = get_node_or_null("/root/GameManager")
+		if game_manager and game_manager.has_method("hero_death"):
+			game_manager.hero_death()
 		return
 	
 	# 恢复移动

@@ -33,8 +33,8 @@ var battle_speed: float = 1.0
 var turn_delay: float = 1.0
 
 # 引用
-var hero_manager: HeroManager
-var loop_manager: LoopManager
+var hero_manager: Node
+var loop_manager: Node
 
 func _ready():
 	# 连接信号
@@ -42,7 +42,7 @@ func _ready():
 	
 	print("Battle Manager initialized")
 
-func start_battle(enemy: Dictionary, hero_mgr: HeroManager = null, loop_mgr: LoopManager = null):
+func start_battle(enemy: Dictionary, hero_mgr: Node = null, loop_mgr: Node = null):
 	"""开始战斗"""
 	if current_state != BattleState.IDLE:
 		print("Battle already in progress")
@@ -234,15 +234,18 @@ func _apply_victory_rewards(rewards: Dictionary):
 	"""应用胜利奖励"""
 	# 给予经验
 	if hero_manager and rewards.has("experience"):
-		hero_manager.gain_experience(rewards.experience)
-		_add_battle_log("获得 " + str(rewards.experience) + " 点经验")
+		if hero_manager.has_method("gain_experience"):
+			hero_manager.gain_experience(rewards.experience)
+			_add_battle_log("获得 " + str(rewards.experience) + " 点经验")
 	
 	# 给予资源
-	if rewards.has("resources") and GameManager.instance:
-		for resource_type in rewards.resources:
-			var amount = rewards.resources[resource_type]
-			GameManager.instance.add_resources(resource_type, amount)
-			_add_battle_log("获得 " + str(amount) + " " + resource_type)
+	if rewards.has("resources"):
+		var game_manager = get_node_or_null("/root/GameManager")
+		if game_manager and game_manager.has_method("add_resources"):
+			for resource_type in rewards.resources:
+				var amount = rewards.resources[resource_type]
+				game_manager.add_resources(resource_type, amount)
+				_add_battle_log("获得 " + str(amount) + " " + resource_type)
 	
 	# 给予物品
 	if rewards.has("items"):
@@ -255,19 +258,19 @@ func _generate_random_item() -> Dictionary:
 	var items = [
 		{
 			"name": "生锈的剑",
-			"slot_type": HeroManager.EquipmentSlot.WEAPON,
+			"slot_type": "weapon",
 			"stats": {"attack": 3},
 			"rarity": "common"
 		},
 		{
 			"name": "皮甲",
-			"slot_type": HeroManager.EquipmentSlot.ARMOR,
+			"slot_type": "armor",
 			"stats": {"defense": 2, "max_hp": 5},
 			"rarity": "common"
 		},
 		{
 			"name": "铁盾",
-			"slot_type": HeroManager.EquipmentSlot.SHIELD,
+			"slot_type": "shield",
 			"stats": {"defense": 4},
 			"rarity": "common"
 		}

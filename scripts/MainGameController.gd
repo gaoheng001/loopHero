@@ -4,34 +4,31 @@ class_name MainGameController
 extends Node2D
 
 # 管理器引用
-@onready var game_manager: GameManager = $GameManager
-@onready var loop_manager: LoopManager = $LoopManager
-@onready var card_manager: CardManager = $CardManager
-@onready var hero_manager: HeroManager = $HeroManager
-@onready var battle_manager: BattleManager = $BattleManager
+@onready var game_manager: Node = $GameManager
+@onready var loop_manager: Node = $LoopManager
+@onready var card_manager: Node = $CardManager
+@onready var hero_manager: Node = $HeroManager
+@onready var battle_manager: Node = $BattleManager
 
 # UI引用
-@onready var resources_container = $UI/GameUI/TopPanel/ResourcesContainer
-@onready var wood_label = $UI/GameUI/TopPanel/ResourcesContainer/WoodLabel
-@onready var stone_label = $UI/GameUI/TopPanel/ResourcesContainer/StoneLabel
-@onready var metal_label = $UI/GameUI/TopPanel/ResourcesContainer/MetalLabel
-@onready var food_label = $UI/GameUI/TopPanel/ResourcesContainer/FoodLabel
+@onready var resources_container = $UI/MainUI/TopPanel/ResourcesContainer
+@onready var wood_label = $UI/MainUI/TopPanel/ResourcesContainer/WoodLabel
+@onready var stone_label = $UI/MainUI/TopPanel/ResourcesContainer/StoneLabel
+@onready var metal_label = $UI/MainUI/TopPanel/ResourcesContainer/MetalLabel
+@onready var food_label = $UI/MainUI/TopPanel/ResourcesContainer/FoodLabel
 
-@onready var loop_label = $UI/GameUI/TopPanel/GameInfoContainer/LoopLabel
-@onready var state_label = $UI/GameUI/TopPanel/GameInfoContainer/StateLabel
+@onready var loop_label = $UI/MainUI/BottomPanel/StatusContainer/LoopLabel
+@onready var state_label = $UI/MainUI/BottomPanel/StatusContainer/StateLabel
 
-@onready var hand_container = $UI/GameUI/BottomPanel/HandContainer
-@onready var start_button = $UI/GameUI/BottomPanel/ControlButtons/StartButton
-@onready var retreat_button = $UI/GameUI/BottomPanel/ControlButtons/RetreatButton
-@onready var pause_button = $UI/GameUI/BottomPanel/ControlButtons/PauseButton
+@onready var start_button = $UI/MainUI/BottomPanel/ControlsContainer/StartButton
+@onready var retreat_button = $UI/MainUI/BottomPanel/ControlsContainer/RetreatButton
+@onready var pause_button = $UI/MainUI/BottomPanel/ControlsContainer/PauseButton
 
-@onready var level_label = $UI/GameUI/LeftPanel/HeroInfo/LevelLabel
-@onready var hp_label = $UI/GameUI/LeftPanel/HeroInfo/HPLabel
-@onready var attack_label = $UI/GameUI/LeftPanel/HeroInfo/AttackLabel
-@onready var defense_label = $UI/GameUI/LeftPanel/HeroInfo/DefenseLabel
-@onready var exp_label = $UI/GameUI/LeftPanel/HeroInfo/ExpLabel
+@onready var level_label = $UI/MainUI/TopPanel/HeroPanel/HeroContainer/LevelLabel
+@onready var hp_label = $UI/MainUI/TopPanel/HeroPanel/HeroContainer/HPLabel
 
-@onready var log_text = $UI/GameUI/RightPanel/BattleLog/LogScrollContainer/LogText
+@onready var log_text = $UI/MainUI/LogPanel/LogContainer/LogScrollContainer/LogText
+@onready var hand_container = $UI/MainUI/BottomPanel/HandPanel/HandContainer
 
 # 卡牌UI
 var hand_card_scenes: Array[Control] = []
@@ -100,7 +97,8 @@ func _initialize_ui():
 	_update_game_state_display()
 	
 	# 初始化战斗日志
-	log_text.text = "[color=gray]等待游戏开始...[/color]"
+	if log_text:
+		log_text.text = "[color=gray]等待游戏开始...[/color]"
 
 func _setup_manager_references():
 	"""设置管理器之间的引用"""
@@ -108,23 +106,30 @@ func _setup_manager_references():
 	battle_manager.hero_manager = hero_manager
 	battle_manager.loop_manager = loop_manager
 
-func _on_game_state_changed(new_state: GameManager.GameState):
+func _on_game_state_changed(new_state: int):
 	"""游戏状态改变"""
 	_update_game_state_display()
 	
+	# 简化状态处理，使用数字常量
 	match new_state:
-		GameManager.GameState.IN_LOOP:
-			start_button.text = "循环中..."
-			start_button.disabled = true
-			retreat_button.disabled = false
-		GameManager.GameState.CAMP_MANAGEMENT:
-			start_button.text = "开始循环"
-			start_button.disabled = false
-			retreat_button.disabled = true
-		GameManager.GameState.PAUSED:
-			pause_button.text = "继续"
+		1: # IN_LOOP
+			if start_button:
+				start_button.text = "循环中..."
+				start_button.disabled = true
+			if retreat_button:
+				retreat_button.disabled = false
+		2: # CAMP_MANAGEMENT
+			if start_button:
+				start_button.text = "开始循环"
+				start_button.disabled = false
+			if retreat_button:
+				retreat_button.disabled = true
+		3: # PAUSED
+			if pause_button:
+				pause_button.text = "继续"
 		_:
-			pause_button.text = "暂停"
+			if pause_button:
+				pause_button.text = "暂停"
 
 func _on_resources_changed(resources: Dictionary):
 	"""资源改变"""
@@ -132,7 +137,8 @@ func _on_resources_changed(resources: Dictionary):
 
 func _on_loop_completed(loop_number: int):
 	"""循环完成"""
-	loop_label.text = "循环: " + str(loop_number)
+	if loop_label:
+		loop_label.text = "循环: " + str(loop_number)
 	_add_log("[color=green]完成第 " + str(loop_number) + " 次循环！[/color]")
 
 func _on_loop_manager_loop_completed():
@@ -197,15 +203,14 @@ func _on_experience_gained(amount: int):
 
 func _on_start_button_pressed():
 	"""开始按钮点击"""
-	match game_manager.current_state:
-		GameManager.GameState.MAIN_MENU, GameManager.GameState.CAMP_MANAGEMENT:
-			game_manager.start_new_loop()
-			loop_manager.start_hero_movement()
-			_add_log("[color=cyan]开始新的循环冒险！[/color]")
+	if game_manager.has_method("start_new_loop"):
+		game_manager.start_new_loop()
+		loop_manager.start_hero_movement()
+		_add_log("[color=cyan]开始新的循环冒险！[/color]")
 
 func _on_retreat_button_pressed():
 	"""撤退按钮点击"""
-	if game_manager.current_state == GameManager.GameState.IN_LOOP:
+	if game_manager.has_method("retreat_from_loop"):
 		loop_manager.stop_hero_movement()
 		game_manager.retreat_from_loop()
 		_add_log("[color=orange]从循环中撤退[/color]")
@@ -217,33 +222,42 @@ func _on_pause_button_pressed():
 func _update_resources_display():
 	"""更新资源显示"""
 	if game_manager:
-		wood_label.text = "木材: " + str(game_manager.get_resource_amount("wood"))
-		stone_label.text = "石头: " + str(game_manager.get_resource_amount("stone"))
-		metal_label.text = "金属: " + str(game_manager.get_resource_amount("metal"))
-		food_label.text = "食物: " + str(game_manager.get_resource_amount("food"))
+		if wood_label:
+			wood_label.text = "木材: " + str(game_manager.get_resource_amount("wood"))
+		if stone_label:
+			stone_label.text = "石头: " + str(game_manager.get_resource_amount("stone"))
+		if metal_label:
+			metal_label.text = "金属: " + str(game_manager.get_resource_amount("metal"))
+		if food_label:
+			food_label.text = "食物: " + str(game_manager.get_resource_amount("food"))
 
 func _update_hero_display():
 	"""更新英雄信息显示"""
-	var stats = hero_manager.get_stats()
-	level_label.text = "等级: " + str(hero_manager.level)
-	hp_label.text = "生命值: " + str(stats.current_hp) + "/" + str(stats.max_hp)
-	attack_label.text = "攻击力: " + str(stats.attack)
-	defense_label.text = "防御力: " + str(stats.defense)
-	exp_label.text = "经验: " + str(hero_manager.experience) + "/" + str(hero_manager.experience_to_next_level)
+	if hero_manager:
+		var stats = hero_manager.get_stats()
+		if level_label:
+			level_label.text = "等级: " + str(hero_manager.level)
+		if hp_label:
+			hp_label.text = "生命值: " + str(stats.current_hp) + "/" + str(stats.max_hp)
 
 func _update_game_state_display():
 	"""更新游戏状态显示"""
-	match game_manager.current_state:
-		GameManager.GameState.MAIN_MENU:
-			state_label.text = "状态: 主菜单"
-		GameManager.GameState.IN_LOOP:
-			state_label.text = "状态: 循环中"
-		GameManager.GameState.CAMP_MANAGEMENT:
-			state_label.text = "状态: 营地管理"
-		GameManager.GameState.PAUSED:
-			state_label.text = "状态: 暂停"
-		GameManager.GameState.GAME_OVER:
-			state_label.text = "状态: 游戏结束"
+	if game_manager:
+		var state_text = ""
+		match game_manager.current_state:
+			1: # IN_LOOP
+				state_text = "循环中"
+			2: # CAMP_MANAGEMENT
+				state_text = "营地管理"
+			3: # PAUSED
+				state_text = "已暂停"
+			_:
+				state_text = "未知状态"
+		
+		if state_label:
+			state_label.text = "状态: " + state_text
+		if loop_label:
+			loop_label.text = "循环: " + str(game_manager.loop_number)
 
 func _update_hand_display():
 	"""更新手牌显示"""
@@ -253,12 +267,14 @@ func _update_hand_display():
 	hand_card_scenes.clear()
 	
 	# 创建新的手牌UI
-	var hand = card_manager.get_hand()
-	for i in range(hand.size()):
-		var card_data = hand[i]
-		var card_ui = _create_card_ui(card_data, i)
-		hand_container.add_child(card_ui)
-		hand_card_scenes.append(card_ui)
+	if card_manager:
+		var hand = card_manager.get_hand()
+		for i in range(hand.size()):
+			var card_data = hand[i]
+			var card_ui = _create_card_ui(card_data, i)
+			if hand_container:
+				hand_container.add_child(card_ui)
+			hand_card_scenes.append(card_ui)
 
 func _create_card_ui(card_data: Dictionary, index: int) -> Control:
 	"""创建卡牌UI"""
@@ -268,14 +284,15 @@ func _create_card_ui(card_data: Dictionary, index: int) -> Control:
 	card_button.tooltip_text = card_data.description
 	
 	# 根据卡牌类型设置颜色
-	match card_data.type:
-		CardManager.CardType.ENEMY:
+	# 根据卡牌类型设置颜色（使用字符串匹配）
+	match card_data.get("type", ""):
+		"enemy":
 			card_button.modulate = Color.RED
-		CardManager.CardType.TERRAIN:
+		"terrain":
 			card_button.modulate = Color.GREEN
-		CardManager.CardType.BUILDING:
+		"building":
 			card_button.modulate = Color.BLUE
-		CardManager.CardType.SPECIAL:
+		"special":
 			card_button.modulate = Color.PURPLE
 	
 	# 连接点击信号
@@ -350,13 +367,19 @@ func _cancel_card_placement():
 
 func _add_log(message: String):
 	"""添加日志消息"""
-	log_text.text += "\n" + message
-	
-	# 限制日志长度
-	var lines = log_text.text.split("\n")
-	if lines.size() > 50:
-		lines = lines.slice(-50)
-		log_text.text = "\n".join(lines)
+	if log_text:
+		log_text.text += "\n" + message
+		
+		# 限制日志长度
+		var lines = log_text.text.split("\n")
+		if lines.size() > 50:
+			lines = lines.slice(-50)
+			log_text.text = "\n".join(lines)
+		
+		# 自动滚动到底部
+		var scroll_container = log_text.get_parent()
+		if scroll_container:
+			scroll_container.scroll_vertical = scroll_container.get_v_scroll_bar().max_value
 
 func _draw():
 	"""绘制调试信息"""
