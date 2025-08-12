@@ -14,7 +14,6 @@ config/name="Loop Legend"
 config/description="A Loop Hero-like adventure game built with Godot 4.4"
 run/main_scene="res://scenes/MainGame.tscn"
 config/features=PackedStringArray("4.4", "Forward Plus")
-config/icon="res://resources/icon.svg"
 
 [display]
 

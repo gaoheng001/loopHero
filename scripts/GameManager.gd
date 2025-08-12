@@ -155,15 +155,19 @@ func reset_resources():
 func _input(event):
 	"""处理全局输入"""
 	if event.is_action_pressed("pause"):
+		print("[GameManager] Pause key pressed, toggling pause")
 		toggle_pause()
 
 func toggle_pause():
 	"""切换暂停状态"""
+	print("[GameManager] toggle_pause called, current_state: ", current_state, ", is_paused: ", is_paused)
 	if current_state == GameState.IN_LOOP:
 		if is_paused:
+			print("[GameManager] Unpausing game")
 			change_state(GameState.IN_LOOP)
 			is_paused = false
 		else:
+			print("[GameManager] Pausing game")
 			change_state(GameState.PAUSED)
 			is_paused = true
 

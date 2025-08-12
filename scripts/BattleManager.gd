@@ -35,11 +35,9 @@ var turn_delay: float = 1.0
 # 引用
 var hero_manager: Node
 var loop_manager: Node
+var battle_window: Node
 
 func _ready():
-	# 连接信号
-	battle_ended.connect(_on_battle_ended)
-	
 	print("Battle Manager initialized")
 
 func start_battle(enemy: Dictionary, hero_mgr: Node = null, loop_mgr: Node = null):
@@ -117,6 +115,10 @@ func _start_auto_battle():
 
 func _hero_attack():
 	"""英雄攻击"""
+	# 播放攻击动画
+	if battle_window:
+		battle_window.show_attack_animation("Hero")
+	
 	var damage = _calculate_hero_damage()
 	var actual_damage = _apply_damage_to_enemy(damage)
 	
@@ -126,6 +128,10 @@ func _hero_attack():
 
 func _enemy_attack():
 	"""敌人攻击"""
+	# 播放攻击动画
+	if battle_window:
+		battle_window.show_attack_animation("Enemy")
+	
 	var damage = _calculate_enemy_damage()
 	var actual_damage = _apply_damage_to_hero(damage)
 	
@@ -198,6 +204,14 @@ func _end_battle(victory: bool):
 	
 	battle_ended.emit(victory, rewards)
 	print("Battle ended. Victory: ", victory)
+	
+	# 注释掉直接调用，避免重复调用on_battle_ended
+	# 现在只通过信号连接来调用，确保只调用一次
+	# if loop_manager:
+	#	print("[BattleManager] Calling loop_manager.on_battle_ended")
+	#	loop_manager.on_battle_ended(victory, rewards)
+	# else:
+	#	print("[BattleManager] Error: loop_manager is null!")
 	
 	# 重置状态
 	current_state = BattleState.IDLE
@@ -282,13 +296,14 @@ func _add_battle_log(message: String):
 	"""添加战斗日志"""
 	battle_log.append(message)
 	battle_log_updated.emit(message)
+	
+	# 同时更新战斗窗口的日志
+	if battle_window:
+		battle_window.add_battle_log(message)
+	
 	print("[Battle] ", message)
 
-func _on_battle_ended(victory: bool, rewards: Dictionary):
-	"""战斗结束回调"""
-	# 通知循环管理器
-	if loop_manager:
-		loop_manager.on_battle_ended(victory)
+# 移除了_on_battle_ended函数，现在直接在_end_battle中调用loop_manager.on_battle_ended
 
 func get_battle_log() -> Array[String]:
 	"""获取战斗日志"""

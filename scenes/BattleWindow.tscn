@@ -1,0 +1,173 @@
+[gd_scene load_steps=2 format=4 uid="uid://bvkxqy8r1n3ys"]
+
+[ext_resource type="Script" path="res://scripts/BattleWindow.gd" id="1_battle"]
+
+[node name="BattleWindow" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_battle")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.8)
+
+[node name="BattlePanel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -500.0
+offset_top = -300.0
+offset_right = 500.0
+offset_bottom = 300.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MainContainer" type="HBoxContainer" parent="BattlePanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BattleArea" type="HBoxContainer" parent="BattlePanel/MainContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.0
+
+[node name="HeroSection" type="VBoxContainer" parent="BattlePanel/MainContainer/BattleArea"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+
+[node name="HeroLabel" type="Label" parent="BattlePanel/MainContainer/BattleArea/HeroSection"]
+layout_mode = 2
+text = "英雄"
+horizontal_alignment = 1
+
+[node name="HeroSprite" type="ColorRect" parent="BattlePanel/MainContainer/BattleArea/HeroSection"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 120)
+size_flags_horizontal = 4
+color = Color(0.2, 0.6, 1, 1)
+
+[node name="HeroStats" type="VBoxContainer" parent="BattlePanel/MainContainer/BattleArea/HeroSection"]
+layout_mode = 2
+
+[node name="HeroHP" type="Label" parent="BattlePanel/MainContainer/BattleArea/HeroSection/HeroStats"]
+layout_mode = 2
+text = "HP: 100/100"
+horizontal_alignment = 1
+
+[node name="HeroAttack" type="Label" parent="BattlePanel/MainContainer/BattleArea/HeroSection/HeroStats"]
+layout_mode = 2
+text = "攻击: 15"
+horizontal_alignment = 1
+
+[node name="HeroDefense" type="Label" parent="BattlePanel/MainContainer/BattleArea/HeroSection/HeroStats"]
+layout_mode = 2
+text = "防御: 5"
+horizontal_alignment = 1
+
+[node name="VSLabel" type="Label" parent="BattlePanel/MainContainer/BattleArea"]
+layout_mode = 2
+size_flags_horizontal = 4
+text = "VS"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="EnemySection" type="VBoxContainer" parent="BattlePanel/MainContainer/BattleArea"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+
+[node name="EnemyLabel" type="Label" parent="BattlePanel/MainContainer/BattleArea/EnemySection"]
+layout_mode = 2
+text = "敌人"
+horizontal_alignment = 1
+
+[node name="EnemySprite" type="ColorRect" parent="BattlePanel/MainContainer/BattleArea/EnemySection"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 120)
+size_flags_horizontal = 4
+color = Color(1, 0.2, 0.2, 1)
+
+[node name="EnemyStats" type="VBoxContainer" parent="BattlePanel/MainContainer/BattleArea/EnemySection"]
+layout_mode = 2
+
+[node name="EnemyHP" type="Label" parent="BattlePanel/MainContainer/BattleArea/EnemySection/EnemyStats"]
+layout_mode = 2
+text = "HP: 50/50"
+horizontal_alignment = 1
+
+[node name="EnemyAttack" type="Label" parent="BattlePanel/MainContainer/BattleArea/EnemySection/EnemyStats"]
+layout_mode = 2
+text = "攻击: 8"
+horizontal_alignment = 1
+
+[node name="EnemyDefense" type="Label" parent="BattlePanel/MainContainer/BattleArea/EnemySection/EnemyStats"]
+layout_mode = 2
+text = "防御: 2"
+horizontal_alignment = 1
+
+[node name="LogSection" type="VBoxContainer" parent="BattlePanel/MainContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.0
+
+[node name="LogTitle" type="Label" parent="BattlePanel/MainContainer/LogSection"]
+layout_mode = 2
+text = "战斗记录"
+horizontal_alignment = 1
+
+[node name="LogScrollContainer" type="ScrollContainer" parent="BattlePanel/MainContainer/LogSection"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="LogText" type="RichTextLabel" parent="BattlePanel/MainContainer/LogSection/LogScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+bbcode_enabled = true
+text = "[color=gray]战斗即将开始...[/color]"
+fit_content = true
+
+[node name="ActionContainer" type="HBoxContainer" parent="BattlePanel/MainContainer/LogSection"]
+layout_mode = 2
+alignment = 1
+
+[node name="AttackButton" type="Button" parent="BattlePanel/MainContainer/LogSection/ActionContainer"]
+layout_mode = 2
+text = "攻击"
+
+[node name="DefendButton" type="Button" parent="BattlePanel/MainContainer/LogSection/ActionContainer"]
+layout_mode = 2
+text = "防御"
+
+[node name="CloseButton" type="Button" parent="BattlePanel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -40.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 40.0
+grow_horizontal = 0
+text = "X"
