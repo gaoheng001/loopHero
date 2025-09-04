@@ -68,6 +68,14 @@ var skill_points: int = 0
 # 状态效果
 var status_effects: Array[Dictionary] = []
 
+# 地形buff系统
+var terrain_buffs: Dictionary = {
+	"attack_bonus": 0,  # 攻击力加成
+	"max_hp_bonus": 0,  # 生命上限加成
+	"experience_bonus_percent": 0  # 经验加成百分比
+}
+var placed_terrain_cards: Array[Dictionary] = []  # 已放置的地形卡牌
+
 func _ready():
 	# 初始化英雄
 	_initialize_hero()
@@ -129,7 +137,7 @@ func _initialize_skills():
 			}
 
 func _calculate_stats():
-	"""计算当前属性（基础+装备+技能加成）"""
+	"""计算当前属性（基础+装备+技能+地形加成）"""
 	current_stats = base_stats.duplicate()
 	
 	# 应用装备加成
@@ -142,6 +150,9 @@ func _calculate_stats():
 	
 	# 应用技能加成
 	_apply_skill_bonuses()
+	
+	# 应用地形buff加成
+	_apply_terrain_buffs()
 	
 	# 应用状态效果
 	_apply_status_effects()
@@ -374,14 +385,75 @@ func reset_hero():
 		equipment[slot] = {}
 	
 	# 重置技能
-	for skill_name in skills:
-		skills[skill_name].level = 0
+	_initialize_skills()
 	
-	# 重置状态效果
-	status_effects.clear()
+	# 重置地形buff
+	terrain_buffs = {
+		"attack_bonus": 0,
+		"max_hp_bonus": 0,
+		"experience_bonus_percent": 0
+	}
+	placed_terrain_cards.clear()
 	
-	# 重新初始化
-	_initialize_hero()
+	# 重新计算属性
 	_calculate_stats()
 	
-	print("Hero reset to level 1")
+	# 发出信号
+	hero_stats_changed.emit(current_stats)
+
+# 地形buff系统函数
+func _apply_terrain_buffs():
+	"""应用地形buff加成"""
+	# 攻击力加成
+	current_stats.attack += terrain_buffs.attack_bonus
+	
+	# 生命上限加成
+	current_stats.max_hp += terrain_buffs.max_hp_bonus
+
+func add_terrain_card(card_data: Dictionary):
+	"""添加地形卡牌效果"""
+	placed_terrain_cards.append(card_data)
+	
+	# 应用初始效果
+	if card_data.has("effects"):
+		var effects = card_data.effects
+		
+		if effects.has("initial_attack_bonus"):
+			terrain_buffs.attack_bonus += effects.initial_attack_bonus
+			print("[HeroManager] 竹林效果：攻击力+", effects.initial_attack_bonus)
+		
+		if effects.has("initial_max_hp_bonus"):
+			terrain_buffs.max_hp_bonus += effects.initial_max_hp_bonus
+			print("[HeroManager] 山峰效果：生命上限+", effects.initial_max_hp_bonus)
+		
+		if effects.has("experience_bonus_percent"):
+			terrain_buffs.experience_bonus_percent += effects.experience_bonus_percent
+			print("[HeroManager] 河流效果：经验加成+", effects.experience_bonus_percent, "%")
+	
+	# 重新计算属性
+	_calculate_stats()
+	hero_stats_changed.emit(current_stats)
+
+func apply_daily_terrain_effects():
+	"""应用每日地形效果"""
+	for card in placed_terrain_cards:
+		if card.has("effects"):
+			var effects = card.effects
+			
+			# 竹林每日攻击力加成
+			if effects.has("daily_attack_bonus"):
+				terrain_buffs.attack_bonus += effects.daily_attack_bonus
+				print("[HeroManager] 竹林每日效果：攻击力+", effects.daily_attack_bonus)
+			
+			# 山峰每日治疗
+			if effects.has("daily_heal"):
+				heal(effects.daily_heal)
+				print("[HeroManager] 山峰每日效果：恢复", effects.daily_heal, "点生命值")
+	
+	# 重新计算属性
+	_calculate_stats()
+	hero_stats_changed.emit(current_stats)
+
+func get_experience_multiplier() -> float:
+	"""获取经验倍率"""
+	return 1.0 + (terrain_buffs.experience_bonus_percent / 100.0)

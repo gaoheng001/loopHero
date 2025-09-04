@@ -18,6 +18,10 @@ const LOOP_RADIUS = 200
 const TILES_PER_LOOP = 12
 const MOVE_SPEED = 100.0
 
+# 网格地图配置
+const GRID_SIZE = 40  # 40x40的网格，确保覆盖整个游戏区域
+const GRID_TILE_SIZE = 16  # 每个网格瓦片的基础大小，与TileSet的texture_region_size一致
+
 # 时间系统配置
 const STEPS_PER_DAY = 20
 
@@ -37,8 +41,14 @@ var movement_tween: Tween  # 移动动画的 tween 实例
 var hero_position: Vector2
 var loop_path: Array[Vector2] = []
 var placed_cards: Dictionary = {}  # tile_index -> card_data
+var placed_terrain_cards: Dictionary = {}  # tile_index -> terrain_card_data
 var just_finished_battle: bool = false  # 刚刚结束战斗的标记
 var step_count: int = 0  # 步数计数器
+
+# 网格地图状态
+var grid_terrain_cards: Dictionary = {}  # Vector2i(grid_x, grid_y) -> terrain_card_data
+var grid_visual_node: Node2D  # 网格可视化节点
+var placeable_highlights = []  # 可放置区域高亮精灵列表
 
 # 时间系统
 var current_day: int = 1  # 当前天数
@@ -83,6 +93,9 @@ func _ready():
 	
 	# 生成循环路径
 	_generate_loop_path()
+	
+	# 创建网格可视化
+	_create_grid_visualization()
 	
 	# 初始化第一关地图
 	_initialize_level1_map()
@@ -223,14 +236,23 @@ func _initialize_level1_map():
 
 func start_hero_movement():
 	"""开始英雄移动"""
+	print("[LoopManager] start_hero_movement called!")
+	print("[LoopManager] Current is_moving state: ", is_moving)
+	print("[LoopManager] Hero node exists: ", hero_node != null)
+	print("[LoopManager] Loop path size: ", loop_path.size())
 	if not is_moving:
 		is_moving = true
+		print("[LoopManager] Setting is_moving to true")
 		# 确保Character_sword节点位于起始位置
 		if hero_node and loop_path.size() > 0:
 			hero_node.position = loop_path[0]
 			hero_position = loop_path[0]
+			print("[LoopManager] Set hero position to: ", loop_path[0])
 		queue_redraw()  # 初始绘制
+		print("[LoopManager] Calling _move_to_next_tile()")
 		_move_to_next_tile()
+	else:
+		print("[LoopManager] Hero is already moving, ignoring start request")
 
 func stop_hero_movement():
 	"""停止英雄移动"""
@@ -718,5 +740,485 @@ func _draw():
 			var next_pos = loop_path[(i + 1) % loop_path.size()]
 			
 			draw_line(current_pos, next_pos, Color.WHITE, 3.0)
+
+# 地形卡牌管理函数
+func can_place_terrain_at_tile(tile_index: int) -> bool:
+	"""检查是否可以在指定瓦片放置地形卡牌（旧版本，保持兼容性）"""
+	# 检查索引是否有效
+	if tile_index < 0 or tile_index >= TILES_PER_LOOP:
+		return false
+	
+	# 检查是否已有地形卡牌
+	if tile_index in placed_terrain_cards:
+		return false
+	
+	# 检查是否已有其他卡牌
+	if tile_index in placed_cards:
+		return false
+	
+	return true
+
+func can_place_terrain_at_grid_position(grid_pos: Vector2i) -> bool:
+	"""检查是否可以在指定TileMapLayer瓦片位置放置地形卡牌"""
+	if not tile_map_layer:
+		return false
+	
+	# 检查是否是路径瓦片（不能在路径上放置地形）
+	var atlas_coords = tile_map_layer.get_cell_atlas_coords(grid_pos)
+	if atlas_coords == Vector2i(25, 5):  # 路径瓦片
+		return false
+	
+	# 检查是否已有地形卡牌
+	if grid_pos in grid_terrain_cards:
+		return false
+	
+	# 检查是否在白色空地瓦片区域内（只有白色空地瓦片的位置才能放置地形）
+	if atlas_coords != Vector2i(5, 2):  # 不是白色空地瓦片
+		return false
+	
+	return true
+
+func world_position_to_grid_position(world_pos: Vector2) -> Vector2i:
+	"""将世界坐标转换为TileMapLayer瓦片坐标"""
+	if not tile_map_layer:
+		return Vector2i(0, 0)
+	
+	# 将世界坐标转换为相对于TileMapLayer的本地坐标
+	var local_pos = world_pos - position - tile_map_layer.position
+	
+	# 使用TileMapLayer的local_to_map方法进行坐标转换
+	var tile_pos = tile_map_layer.local_to_map(local_pos / tile_map_layer.scale)
+	
+	return tile_pos
+
+func grid_position_to_world_position(grid_pos: Vector2i) -> Vector2:
+	"""将TileMapLayer瓦片坐标转换为世界坐标"""
+	if not tile_map_layer:
+		return Vector2.ZERO
+	
+	# 使用TileMapLayer的map_to_local方法进行坐标转换
+	var local_pos = tile_map_layer.map_to_local(grid_pos)
+	
+	# 应用TileMapLayer的变换（缩放和位置）
+	var transformed_pos = local_pos * tile_map_layer.scale + tile_map_layer.position
+	
+	# 转换为世界坐标
+	return transformed_pos + position
+
+func place_terrain_card(tile_index: int, card_data: Dictionary):
+	"""在指定瓦片放置地形卡牌（旧版本，保持兼容性）"""
+	if can_place_terrain_at_tile(tile_index):
+		placed_terrain_cards[tile_index] = card_data
+		print("[LoopManager] 在瓦片", tile_index, "放置地形卡牌：", card_data.name)
 		
+		# 创建地形卡牌的视觉表示
+		_create_terrain_visual(tile_index, card_data)
+		return true
+	return false
+
+func place_terrain_card_at_grid_position(grid_pos: Vector2i, card_data: Dictionary) -> bool:
+	"""在指定网格位置放置地形卡牌"""
+	if can_place_terrain_at_grid_position(grid_pos):
+		grid_terrain_cards[grid_pos] = card_data
+		print("[LoopManager] 在网格位置", grid_pos, "放置地形卡牌：", card_data.name)
+		
+		# 创建地形卡牌的视觉表示
+		_create_terrain_visual_at_grid(grid_pos, card_data)
+		return true
+	return false
+
+func find_closest_grid_position(world_pos: Vector2) -> Vector2i:
+	"""找到最接近世界坐标的网格位置"""
+	return world_position_to_grid_position(world_pos)
+
+func _create_terrain_visual(tile_index: int, card_data: Dictionary):
+	"""创建地形卡牌的视觉表示（旧版本）"""
+	var tile_pos = get_tile_position(tile_index)
+	
+	# 创建一个简单的彩色圆圈表示地形
+	var terrain_sprite = Sprite2D.new()
+	var texture = ImageTexture.new()
+	var image = Image.create(32, 32, false, Image.FORMAT_RGBA8)
+	
+	# 根据地形类型设置颜色
+	var color: Color
+	match card_data.id:
+		"bamboo_forest":
+			color = Color.GREEN
+		"mountain_peak":
+			color = Color.GRAY
+		"river":
+			color = Color.BLUE
+		_:
+			color = Color.WHITE
+	
+	# 填充圆形
+	for x in range(32):
+		for y in range(32):
+			var distance = Vector2(x - 16, y - 16).length()
+			if distance <= 12:
+				image.set_pixel(x, y, color)
+			else:
+				image.set_pixel(x, y, Color.TRANSPARENT)
+	
+	texture.set_image(image)
+	terrain_sprite.texture = texture
+	terrain_sprite.position = tile_pos
+	terrain_sprite.z_index = 1
+	
+	add_child(terrain_sprite)
+	
+	# 存储精灵引用（如果需要后续移除）
+	if not has_meta("terrain_sprites"):
+		set_meta("terrain_sprites", {})
+	get_meta("terrain_sprites")[tile_index] = terrain_sprite
+
+func _create_terrain_visual_at_grid(grid_pos: Vector2i, card_data: Dictionary):
+	# 直接在TileMapLayer上设置地形瓦片，而不是创建额外的精灵
+	if not tile_map_layer:
+		return
+	
+	# 根据地形类型选择对应的瓦片atlas坐标，使用不同颜色的瓦片表示不同地形
+	var terrain_atlas_coords: Vector2i
+	match card_data.id:
+		"bamboo_forest":
+			# 使用绿色瓦片 - 选择atlas中的绿色区域瓦片
+			terrain_atlas_coords = Vector2i(2, 1)  # 绿色瓦片
+		"mountain_peak":
+			# 使用灰色瓦片 - 选择atlas中的灰色区域瓦片
+			terrain_atlas_coords = Vector2i(3, 1)  # 灰色瓦片
+		"river":
+			# 使用蓝色瓦片 - 选择atlas中的蓝色区域瓦片
+			terrain_atlas_coords = Vector2i(1, 1)  # 蓝色瓦片
+		_:
+			# 默认使用白色空地瓦片
+			terrain_atlas_coords = Vector2i(5, 2)  # 白色空地瓦片
+	
+	# 在TileMapLayer上设置地形瓦片
+	tile_map_layer.set_cell(grid_pos, 0, terrain_atlas_coords)
+	
+	print("[LoopManager] 在TileMapLayer位置", grid_pos, "设置地形瓦片：", card_data.name, "，atlas坐标：", terrain_atlas_coords)
+
+func get_terrain_at_tile(tile_index: int) -> Dictionary:
+	"""获取指定瓦片的地形卡牌数据"""
+	if tile_index in placed_terrain_cards:
+		return placed_terrain_cards[tile_index]
+	return {}
+
+func remove_terrain_at_tile(tile_index: int):
+	"""移除指定瓦片的地形卡牌"""
+	if tile_index in placed_terrain_cards:
+		placed_terrain_cards.erase(tile_index)
+		
+		# 移除视觉表示
+		if has_meta("terrain_sprites"):
+			var terrain_sprites = get_meta("terrain_sprites")
+			if tile_index in terrain_sprites:
+				terrain_sprites[tile_index].queue_free()
+				terrain_sprites.erase(tile_index)
+	
+	print("[LoopManager] 移除瓦片", tile_index, "的地形卡牌")
+
+
+
+func get_terrain_at_grid_position(grid_pos: Vector2i) -> Dictionary:
+	"""获取指定网格位置的地形卡牌数据"""
+	if grid_pos in grid_terrain_cards:
+		return grid_terrain_cards[grid_pos]
+	return {}
+
+func remove_terrain_at_grid_position(grid_pos: Vector2i):
+	"""移除指定TileMapLayer瓦片位置的地形卡牌"""
+	if grid_pos in grid_terrain_cards:
+		grid_terrain_cards.erase(grid_pos)
+		
+		# 在TileMapLayer上恢复为白色空地瓦片
+		if tile_map_layer:
+			tile_map_layer.set_cell(grid_pos, 0, Vector2i(5, 2))  # 恢复为白色空地
+	
+	print("[LoopManager] 移除TileMapLayer位置", grid_pos, "的地形卡牌")
+
+func _get_actual_tile_size() -> float:
+	"""获取TileMapLayer的实际瓦片大小"""
+	if not tile_map_layer:
+		return GRID_TILE_SIZE  # 如果没有TileMapLayer，使用默认大小
+	
+	# 获取TileMapLayer的瓦片大小和缩放
+	var tile_set = tile_map_layer.tile_set
+	if not tile_set:
+		return GRID_TILE_SIZE  # 如果没有TileSet，使用默认大小
+	
+	# 获取瓦片的基础大小
+	var base_tile_size = tile_set.tile_size.x  # 假设瓦片是正方形
+	
+	# 应用TileMapLayer的缩放
+	var actual_size = base_tile_size * tile_map_layer.scale.x
+	
+	print("[LoopManager] TileMapLayer实际瓦片大小: ", actual_size, "像素 (基础大小: ", base_tile_size, ", 缩放: ", tile_map_layer.scale.x, ")")
+	return actual_size
+
+func _create_grid_visualization():
+	"""基于TileMapLayer创建网格可视化"""
+	if not tile_map_layer:
+		print("[LoopManager] 警告: TileMapLayer未找到，无法创建网格")
+		return
+	
+	# 清除现有的网格瓦片（保留路径瓦片）
+	_clear_grid_tiles()
+	
+	# 在TileMapLayer上创建白色空瓦片网格
+	_create_tilemap_grid()
+	
+	print("[LoopManager] 基于TileMapLayer的网格可视化创建完成")
+
+func _clear_grid_tiles():
+	"""清除网格区域的瓦片（保留路径瓦片）"""
+	if not tile_map_layer:
+		return
+	
+	# 首先找到循环路径在TileMapLayer中的瓦片坐标范围
+	var path_tile_positions: Array[Vector2i] = []
+	var search_radius = 50  # 扩大搜索半径
+	
+	# 扫描TileMapLayer寻找路径瓦片，确定路径范围
+	for x in range(-search_radius, search_radius + 1):
+		for y in range(-search_radius, search_radius + 1):
+			var tile_pos = Vector2i(x, y)
+			var atlas_coords = tile_map_layer.get_cell_atlas_coords(tile_pos)
+			
+			# 检查是否是路径瓦片
+			if atlas_coords == Vector2i(25, 5):
+				path_tile_positions.append(tile_pos)
+	
+	if path_tile_positions.size() == 0:
+		print("[LoopManager] 警告: 未找到路径瓦片，使用默认范围清除")
+		# 如果没有找到路径瓦片，使用默认范围
+		var grid_half_size = GRID_SIZE / 2
+		
+		for x in range(-grid_half_size, grid_half_size):
+			for y in range(-grid_half_size, grid_half_size):
+				var tile_pos = Vector2i(x, y)
+				var atlas_coords = tile_map_layer.get_cell_atlas_coords(tile_pos)
+				
+				# 如果不是路径瓦片，则清除
+				if atlas_coords != Vector2i(25, 5):
+					tile_map_layer.set_cell(tile_pos, -1)  # 清除瓦片
+		return
+	
+	# 计算路径瓦片的边界
+	var min_x = path_tile_positions[0].x
+	var max_x = path_tile_positions[0].x
+	var min_y = path_tile_positions[0].y
+	var max_y = path_tile_positions[0].y
+	
+	for pos in path_tile_positions:
+		min_x = min(min_x, pos.x)
+		max_x = max(max_x, pos.x)
+		min_y = min(min_y, pos.y)
+		max_y = max(max_y, pos.y)
+	
+	# 扩展边界，为地形卡牌放置留出空间
+	var padding = 8  # 在路径周围留出8个瓦片的空间
+	min_x -= padding
+	max_x += padding
+	min_y -= padding
+	max_y += padding
+	
+	# 在路径周围的区域清除非路径瓦片
+	for x in range(min_x, max_x + 1):
+		for y in range(min_y, max_y + 1):
+			var tile_pos = Vector2i(x, y)
+			var atlas_coords = tile_map_layer.get_cell_atlas_coords(tile_pos)
+			
+			# 如果不是路径瓦片，则清除
+			if atlas_coords != Vector2i(25, 5):
+				tile_map_layer.set_cell(tile_pos, -1)  # 清除瓦片
+
+func _create_tilemap_grid():
+	"""在TileMapLayer上创建白色空瓦片网格"""
+	if not tile_map_layer:
+		return
+	
+	# 首先找到循环路径在TileMapLayer中的瓦片坐标范围
+	var path_tile_positions: Array[Vector2i] = []
+	var search_radius = 100  # 扩大搜索半径到100，确保覆盖整个地图
+	
+	# 扫描TileMapLayer寻找路径瓦片，确定路径范围
+	print("[LoopManager] 开始扫描路径瓦片，搜索范围: ", -search_radius, " 到 ", search_radius)
+	for x in range(-search_radius, search_radius + 1):
+		for y in range(-search_radius, search_radius + 1):
+			var tile_pos = Vector2i(x, y)
+			var atlas_coords = tile_map_layer.get_cell_atlas_coords(tile_pos)
+			
+			# 检查是否是路径瓦片
+			if atlas_coords == Vector2i(25, 5):
+				path_tile_positions.append(tile_pos)
+				print("[LoopManager] 找到路径瓦片: ", tile_pos)
+	
+	print("[LoopManager] 总共找到 ", path_tile_positions.size(), " 个路径瓦片")
+	
+	if path_tile_positions.size() == 0:
+		print("[LoopManager] 警告: 未找到路径瓦片，使用默认范围")
+		# 如果没有找到路径瓦片，使用默认范围
+		var grid_half_size = GRID_SIZE / 2
+		var empty_tile_count = 0
+		
+		for x in range(-grid_half_size, grid_half_size):
+			for y in range(-grid_half_size, grid_half_size):
+				var tile_pos = Vector2i(x, y)
+				var atlas_coords = tile_map_layer.get_cell_atlas_coords(tile_pos)
+				
+				if atlas_coords == Vector2i(-1, -1) or tile_map_layer.get_cell_source_id(tile_pos) == -1:
+					tile_map_layer.set_cell(tile_pos, 0, Vector2i(5, 2))
+					empty_tile_count += 1
+		
+		print("[LoopManager] 创建了", empty_tile_count, "个白色空地瓦片（默认范围）")
+		return
+	
+	# 计算路径瓦片的边界
+	var min_x = path_tile_positions[0].x
+	var max_x = path_tile_positions[0].x
+	var min_y = path_tile_positions[0].y
+	var max_y = path_tile_positions[0].y
+	
+	for pos in path_tile_positions:
+		min_x = min(min_x, pos.x)
+		max_x = max(max_x, pos.x)
+		min_y = min(min_y, pos.y)
+		max_y = max(max_y, pos.y)
+	
+	print("[LoopManager] 路径瓦片边界: (", min_x, ",", min_y, ") 到 (", max_x, ",", max_y, ")")
+	
+	# 考虑到TileMapLayer的变换，计算在屏幕可见范围内的瓦片坐标
+	# TileMapLayer position: (-1212, -881), scale: (2.4, 2.4)
+	# 屏幕尺寸: 1280x720, 摄像机zoom: 0.8
+	var camera_zoom = 0.8
+	var screen_width = 1280.0 / camera_zoom  # 1600
+	var screen_height = 720.0 / camera_zoom  # 900
+	var tile_size = 64.0 * 2.4  # 瓦片实际显示大小
+	
+	# 计算屏幕可见范围对应的瓦片坐标范围
+	var tilemap_pos = Vector2(-1212, -881)
+	var visible_min_x = int((-tilemap_pos.x) / tile_size) - 5
+	var visible_max_x = int((-tilemap_pos.x + screen_width) / tile_size) + 5
+	var visible_min_y = int((-tilemap_pos.y) / tile_size) - 5
+	var visible_max_y = int((-tilemap_pos.y + screen_height) / tile_size) + 5
+	
+	print("[LoopManager] 屏幕可见瓦片范围: (", visible_min_x, ",", visible_min_y, ") 到 (", visible_max_x, ",", visible_max_y, ")")
+	
+	# 由于路径可能超出屏幕可见范围，我们在整个可见范围内生成白色瓦片
+	# 同时确保路径周围也有白色瓦片
+	var padding = 8
+	var extended_min_x = min_x - padding
+	var extended_max_x = max_x + padding
+	var extended_min_y = min_y - padding
+	var extended_max_y = max_y + padding
+	
+	# 合并路径扩展范围和可见范围
+	min_x = min(extended_min_x, visible_min_x)
+	max_x = max(extended_max_x, visible_max_x)
+	min_y = min(extended_min_y, visible_min_y)
+	max_y = max(extended_max_y, visible_max_y)
+	
+	print("[LoopManager] 最终生成范围: (", min_x, ",", min_y, ") 到 (", max_x, ",", max_y, ")")
+	
+	var empty_tile_count = 0
+	
+	# 在路径周围的区域创建白色空地瓦片
+	for x in range(min_x, max_x + 1):
+		for y in range(min_y, max_y + 1):
+			var tile_pos = Vector2i(x, y)
+			var atlas_coords = tile_map_layer.get_cell_atlas_coords(tile_pos)
+			
+			# 如果是空瓦片位置，设置为白色空地瓦片
+			if atlas_coords == Vector2i(-1, -1) or tile_map_layer.get_cell_source_id(tile_pos) == -1:
+				# 使用白色空地瓦片 (使用atlas坐标(5,2)表示白色空地)
+				tile_map_layer.set_cell(tile_pos, 0, Vector2i(5, 2))
+				empty_tile_count += 1
+	
+	print("[LoopManager] 围绕路径创建了", empty_tile_count, "个白色空地瓦片")
+	print("[LoopManager] 最终范围: (", min_x, ",", min_y, ") 到 (", max_x, ",", max_y, ")")
+
+func show_placeable_highlights():
+	"""显示可放置区域的高亮（基于TileMapLayer）"""
+	# 清除之前的高亮
+	hide_placeable_highlights()
+	
+	if not tile_map_layer:
+		return
+	
+	# 获取实际的摄像机信息
+	var camera = get_viewport().get_camera_2d()
+	var camera_zoom = 1.0
+	if camera:
+		camera_zoom = camera.zoom.x  # 假设x和y缩放相同
+	
+	# 获取屏幕尺寸
+	var viewport_size = get_viewport().get_visible_rect().size
+	var screen_width = viewport_size.x / camera_zoom
+	var screen_height = viewport_size.y / camera_zoom
+	
+	# 获取摄像机位置
+	var camera_pos = Vector2(640, 360)  # 默认摄像机位置
+	if camera:
+		camera_pos = camera.global_position
+	
+	# 计算屏幕可见区域的世界坐标范围
+	var screen_left = camera_pos.x - screen_width / 2
+	var screen_right = camera_pos.x + screen_width / 2
+	var screen_top = camera_pos.y - screen_height / 2
+	var screen_bottom = camera_pos.y + screen_height / 2
+	
+	# 将屏幕边界转换为TileMapLayer的瓦片坐标
+	var top_left_grid = world_position_to_grid_position(Vector2(screen_left, screen_top))
+	var bottom_right_grid = world_position_to_grid_position(Vector2(screen_right, screen_bottom))
+	
+	# 添加一些边距以确保覆盖完整
+	var margin = 2
+	var min_x = top_left_grid.x - margin
+	var max_x = bottom_right_grid.x + margin
+	var min_y = top_left_grid.y - margin
+	var max_y = bottom_right_grid.y + margin
+	
+	print("[LoopManager] 摄像机位置: ", camera_pos, ", 缩放: ", camera_zoom)
+	print("[LoopManager] 屏幕可见范围: (", screen_left, ",", screen_top, ") 到 (", screen_right, ",", screen_bottom, ")")
+	print("[LoopManager] 瓦片范围: (", min_x, ",", min_y, ") 到 (", max_x, ",", max_y, ")")
+	
+	# 遍历计算出的瓦片范围
+	for x in range(min_x, max_x + 1):
+		for y in range(min_y, max_y + 1):
+			var grid_pos = Vector2i(x, y)
+			if can_place_terrain_at_grid_position(grid_pos):
+				# 创建高亮精灵
+				var highlight = Sprite2D.new()
+				var texture = ImageTexture.new()
+				
+				# 获取瓦片大小
+				var tile_size = int(_get_actual_tile_size())
+				var image = Image.create(tile_size, tile_size, false, Image.FORMAT_RGBA8)
+				
+				# 创建半透明绿色方形
+				var highlight_color = Color(0, 1, 0, 0.3)  # 半透明绿色
+				for px in range(tile_size):
+					for py in range(tile_size):
+						image.set_pixel(px, py, highlight_color)
+				
+				texture.set_image(image)
+				highlight.texture = texture
+				highlight.position = grid_position_to_world_position(grid_pos) - position
+				highlight.z_index = 10  # 显示在最上层
+				
+				add_child(highlight)
+				placeable_highlights.append(highlight)
+	
+	print("[LoopManager] 显示了", placeable_highlights.size(), "个可放置区域高亮（摄像机可见范围）")
+
+func hide_placeable_highlights():
+	"""隐藏可放置区域的高亮"""
+	for highlight in placeable_highlights:
+		if highlight and is_instance_valid(highlight):
+			highlight.queue_free()
+	placeable_highlights.clear()
+	print("[LoopManager] 隐藏了可放置区域高亮")
+
 		# 英雄现在使用Character_sword节点显示，不需要在这里绘制瓦片位置和英雄

@@ -1,0 +1,131 @@
+[gd_scene load_steps=2 format=4 uid="uid://bqx80ar2m4pvs"]
+
+[ext_resource type="Script" path="res://scripts/CardSelectionWindow.gd" id="1_card_selection"]
+
+[node name="CardSelectionWindow" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_card_selection")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.8)
+
+[node name="SelectionPanel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -400.0
+offset_top = -250.0
+offset_right = 400.0
+offset_bottom = 250.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MainContainer" type="VBoxContainer" parent="SelectionPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TitleLabel" type="Label" parent="SelectionPanel/MainContainer"]
+layout_mode = 2
+text = "选择一张卡牌"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="SelectionPanel/MainContainer"]
+layout_mode = 2
+
+[node name="CardsContainer" type="HBoxContainer" parent="SelectionPanel/MainContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+alignment = 1
+
+[node name="Card1" type="VBoxContainer" parent="SelectionPanel/MainContainer/CardsContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Card1Button" type="Button" parent="SelectionPanel/MainContainer/CardsContainer/Card1"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "卡牌1"
+
+[node name="Card1Name" type="Label" parent="SelectionPanel/MainContainer/CardsContainer/Card1"]
+layout_mode = 2
+text = "卡牌名称"
+horizontal_alignment = 1
+
+[node name="Card1Description" type="Label" parent="SelectionPanel/MainContainer/CardsContainer/Card1"]
+layout_mode = 2
+text = "卡牌描述"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Card2" type="VBoxContainer" parent="SelectionPanel/MainContainer/CardsContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Card2Button" type="Button" parent="SelectionPanel/MainContainer/CardsContainer/Card2"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "卡牌2"
+
+[node name="Card2Name" type="Label" parent="SelectionPanel/MainContainer/CardsContainer/Card2"]
+layout_mode = 2
+text = "卡牌名称"
+horizontal_alignment = 1
+
+[node name="Card2Description" type="Label" parent="SelectionPanel/MainContainer/CardsContainer/Card2"]
+layout_mode = 2
+text = "卡牌描述"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Card3" type="VBoxContainer" parent="SelectionPanel/MainContainer/CardsContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Card3Button" type="Button" parent="SelectionPanel/MainContainer/CardsContainer/Card3"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "卡牌3"
+
+[node name="Card3Name" type="Label" parent="SelectionPanel/MainContainer/CardsContainer/Card3"]
+layout_mode = 2
+text = "卡牌名称"
+horizontal_alignment = 1
+
+[node name="Card3Description" type="Label" parent="SelectionPanel/MainContainer/CardsContainer/Card3"]
+layout_mode = 2
+text = "卡牌描述"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="HSeparator2" type="HSeparator" parent="SelectionPanel/MainContainer"]
+layout_mode = 2
+
+[node name="ButtonContainer" type="HBoxContainer" parent="SelectionPanel/MainContainer"]
+layout_mode = 2
+alignment = 1
+
+[node name="CloseButton" type="Button" parent="SelectionPanel/MainContainer/ButtonContainer"]
+layout_mode = 2
+text = "跳过"

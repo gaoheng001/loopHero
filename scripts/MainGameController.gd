@@ -4,11 +4,11 @@ class_name MainGameController
 extends Node2D
 
 # 管理器引用
-@onready var game_manager: Node = $GameManager
-@onready var loop_manager: Node = $LoopManager
-@onready var card_manager: Node = $CardManager
-@onready var hero_manager: Node = $HeroManager
-@onready var battle_manager: Node = $BattleManager
+@onready var game_manager: Node = $../GameManager
+@onready var loop_manager: Node = $../LoopManager
+@onready var card_manager: Node = $../CardManager
+@onready var hero_manager: Node = $../HeroManager
+@onready var battle_manager: Node = $../BattleManager
 
 # UI引用
 # 时间系统UI
@@ -40,6 +40,9 @@ extends Node2D
 # 战斗窗口引用
 @onready var battle_window = $UI/BattleWindow
 
+# 卡牌选择窗口引用
+@onready var card_selection_window = $UI/CardSelectionWindow
+
 # 卡牌UI
 var hand_card_scenes: Array[Control] = []
 var selected_card_index: int = -1
@@ -49,6 +52,7 @@ var is_placing_card: bool = false
 var hovered_tile_index: int = -1
 
 func _ready():
+	print("[MainGameController] _ready function called!")
 	# 连接管理器信号
 	_connect_manager_signals()
 	
@@ -64,7 +68,9 @@ func _ready():
 	print("Main Game Controller initialized")
 	
 	# 自动开始游戏用于测试
+	print("[MainGameController] About to wait for process_frame and call _on_start_button_pressed")
 	await get_tree().process_frame
+	print("[MainGameController] Process frame completed, calling _on_start_button_pressed")
 	_on_start_button_pressed()
 
 func _connect_manager_signals():
@@ -95,6 +101,10 @@ func _connect_manager_signals():
 	battle_manager.battle_started.connect(_on_battle_manager_battle_started)
 	battle_manager.battle_ended.connect(_on_battle_ended)
 	battle_manager.battle_log_updated.connect(_on_battle_log_updated)
+	
+	# CardSelectionWindow信号
+	card_selection_window.card_selected.connect(_on_card_selection_card_selected)
+	card_selection_window.selection_closed.connect(_on_card_selection_closed)
 	battle_manager.damage_dealt.connect(_on_damage_dealt)
 	
 	# BattleWindow信号
@@ -197,6 +207,18 @@ func _on_day_changed(day: int):
 	"""天数改变"""
 	_add_log("[color=yellow]第" + str(day) + "天开始！[/color]")
 	_update_time_display()
+	
+	# 应用每日地形效果
+	if hero_manager:
+		hero_manager.apply_daily_terrain_effects()
+	
+	# 暂停游戏移动
+	if loop_manager:
+		loop_manager.stop_hero_movement()
+	
+	# 弹出卡牌选择窗口
+	if card_selection_window:
+		card_selection_window.show_card_selection(day)
 
 func _on_monsters_spawned(monster_positions: Array):
 	"""怪物生成"""
@@ -263,10 +285,15 @@ func _on_experience_gained(amount: int):
 
 func _on_start_button_pressed():
 	"""开始按钮点击"""
+	print("[MainGameController] _on_start_button_pressed called!")
 	if game_manager.has_method("start_new_loop"):
+		print("[MainGameController] Calling game_manager.start_new_loop()")
 		game_manager.start_new_loop()
+		print("[MainGameController] Calling loop_manager.start_hero_movement()")
 		loop_manager.start_hero_movement()
 		_add_log("[color=cyan]开始新的循环冒险！[/color]")
+	else:
+		print("[MainGameController] ERROR: game_manager.start_new_loop method not found!")
 
 func _on_retreat_button_pressed():
 	"""撤退按钮点击"""
@@ -406,10 +433,18 @@ func _input(event):
 		if event.button_index == MOUSE_BUTTON_LEFT and is_placing_card:
 			_try_place_card_at_mouse(event.position)
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
-			_cancel_card_placement()
+			if selected_terrain_card.size() > 0:
+				_cancel_terrain_card_placement()
+			else:
+				_cancel_card_placement()
 
 func _try_place_card_at_mouse(mouse_pos: Vector2):
 	"""尝试在鼠标位置放置卡牌"""
+	# 检查是否是地形卡牌放置模式
+	if selected_terrain_card.size() > 0:
+		_try_place_terrain_card_at_mouse(mouse_pos)
+		return
+	
 	if selected_card_index < 0:
 		return
 	
@@ -425,6 +460,35 @@ func _try_place_card_at_mouse(mouse_pos: Vector2):
 			_cancel_card_placement()
 		else:
 			_add_log("[color=red]无法在此位置放置卡牌[/color]")
+
+func _try_place_terrain_card_at_mouse(mouse_pos: Vector2):
+	"""尝试在鼠标位置放置地形卡牌"""
+	# 将屏幕坐标转换为世界坐标
+	var world_pos = get_global_mouse_position()
+	
+	# 找到最近的网格位置
+	var grid_pos = loop_manager.find_closest_grid_position(world_pos)
+	
+	# 检查网格位置是否有效且可以放置地形
+	if loop_manager.can_place_terrain_at_grid_position(grid_pos):
+		# 放置地形卡牌
+		if loop_manager.place_terrain_card_at_grid_position(grid_pos, selected_terrain_card):
+			# 应用地形卡牌效果到英雄
+			hero_manager.add_terrain_card(selected_terrain_card)
+			
+			_add_log("[color=green]成功放置地形卡牌：" + selected_terrain_card.name + "[/color]")
+			
+			# 清除选择状态
+			_cancel_terrain_card_placement()
+			
+			# 恢复游戏移动
+			if loop_manager and not loop_manager.is_moving:
+				loop_manager.start_hero_movement()
+				_add_log("[color=cyan]游戏继续[/color]")
+		else:
+			_add_log("[color=red]放置失败[/color]")
+	else:
+		_add_log("[color=red]此位置无法放置地形卡牌（可能是循环路径或已有地形）[/color]")
 
 func _find_closest_tile(world_pos: Vector2) -> int:
 	"""找到最接近世界坐标的瓦片索引"""
@@ -449,6 +513,26 @@ func _cancel_card_placement():
 	# 恢复所有卡牌的透明度
 	for card_ui in hand_card_scenes:
 		card_ui.modulate.a = 1.0
+	
+	_add_log("取消卡牌放置")
+
+func _cancel_terrain_card_placement():
+	"""取消地形卡牌放置"""
+	is_placing_card = false
+	selected_terrain_card.clear()
+	
+	# 移除预览精灵
+	_remove_terrain_card_preview()
+	
+	# 隐藏可放置区域高亮
+	loop_manager.hide_placeable_highlights()
+	
+	# 恢复游戏移动
+	if loop_manager and not loop_manager.is_moving:
+		loop_manager.start_hero_movement()
+		_add_log("[color=cyan]游戏继续[/color]")
+	
+	_add_log("[color=gray]取消地形卡牌放置[/color]")
 
 func _add_log(message: String):
 	"""添加日志消息"""
@@ -501,7 +585,117 @@ func _on_battle_window_closed():
 	# 通知LoopManager战斗窗口已关闭，可以恢复移动
 	loop_manager.on_battle_window_closed()
 
-func _process(_delta):
-	"""每帧更新"""
+# 删除重复的_process函数定义
+
+# 卡牌选择窗口信号处理函数
+var selected_terrain_card: Dictionary = {}  # 存储选中的地形卡牌
+var terrain_card_preview_sprite: Sprite2D = null  # 地形卡牌预览精灵
+
+func _on_card_selection_card_selected(card_data: Dictionary):
+	"""卡牌选择窗口中卡牌选择后的处理"""
+	_add_log("[color=cyan]选择了卡牌：" + card_data.name + "[/color]")
+	
+	# 存储选中的卡牌数据
+	selected_terrain_card = card_data
+	
+	# 开始拖拽放置模式
+	is_placing_card = true
+	selected_card_index = 0  # 临时索引
+	
+	# 创建地形卡牌预览精灵
+	_create_terrain_card_preview()
+	
+	# 显示可放置区域高亮
+	loop_manager.show_placeable_highlights()
+	
+	# 显示提示信息
+	_add_log("[color=yellow]请在绿色高亮区域放置地形卡牌[/color]")
+	_add_log("[color=gray]左键点击空地放置，右键取消[/color]")
+	
+	# 保持游戏暂停状态，不恢复移动
+	# 游戏将在玩家放置卡牌或取消放置后才恢复移动
+
+func _on_card_selection_closed():
+	"""卡牌选择窗口关闭处理"""
+	_add_log("[color=gray]卡牌选择窗口已关闭[/color]")
+	
+	# 如果正在放置卡牌，取消放置
 	if is_placing_card:
-		queue_redraw()  # 重绘以显示放置预览
+		_cancel_terrain_card_placement()
+	
+	# 隐藏可放置区域高亮
+	loop_manager.hide_placeable_highlights()
+	
+	# 恢复游戏移动
+	if loop_manager and not loop_manager.is_moving:
+		loop_manager.start_hero_movement()
+
+func _create_terrain_card_preview():
+	"""创建地形卡牌预览精灵"""
+	if terrain_card_preview_sprite:
+		_remove_terrain_card_preview()
+	
+	# 创建地形卡牌预览精灵
+	terrain_card_preview_sprite = Sprite2D.new()
+	var texture = ImageTexture.new()
+	# 使用LoopManager的实际瓦片大小
+	var size = int(loop_manager._get_actual_tile_size())
+	var image = Image.create(size, size, false, Image.FORMAT_RGBA8)
+	
+	# 根据地形类型设置颜色
+	var color: Color
+	match selected_terrain_card.id:
+		"bamboo_forest":
+			color = Color.GREEN
+		"mountain_peak":
+			color = Color.GRAY
+		"river":
+			color = Color.BLUE
+		_:
+			color = Color.WHITE
+	
+	# 创建半透明的方形预览（匹配网格系统）
+	for x in range(size):
+		for y in range(size):
+			# 边框
+			if x == 0 or x == size-1 or y == 0 or y == size-1:
+				image.set_pixel(x, y, Color.BLACK)
+			# 内部填充
+			else:
+				image.set_pixel(x, y, Color(color.r, color.g, color.b, 0.6))
+	
+	texture.set_image(image)
+	terrain_card_preview_sprite.texture = texture
+	terrain_card_preview_sprite.z_index = 1000  # 确保在最上层显示
+	
+	# 添加到场景
+	add_child(terrain_card_preview_sprite)
+	
+	print("[MainGameController] 创建地形卡牌预览：", selected_terrain_card.name)
+
+func _remove_terrain_card_preview():
+	"""移除地形卡牌预览精灵"""
+	if terrain_card_preview_sprite:
+		terrain_card_preview_sprite.queue_free()
+		terrain_card_preview_sprite = null
+		print("[MainGameController] 移除地形卡牌预览")
+
+func _process(delta):
+	"""每帧更新"""
+	# 更新地形卡牌预览位置
+	if terrain_card_preview_sprite and is_placing_card and selected_terrain_card.size() > 0:
+		# 让预览精灵跟随鼠标，但吸附到网格位置
+		var mouse_pos = get_global_mouse_position()
+		var grid_pos = loop_manager.find_closest_grid_position(mouse_pos)
+		var snap_world_pos = loop_manager.grid_position_to_world_position(grid_pos)
+		
+		# 预览精灵吸附到网格位置
+		terrain_card_preview_sprite.global_position = snap_world_pos
+		
+		# 检查网格位置是否可以放置地形
+		if loop_manager.can_place_terrain_at_grid_position(grid_pos):
+			# 在有效位置时显示绿色
+			terrain_card_preview_sprite.modulate = Color.WHITE
+		else:
+			# 在无效位置时显示红色
+			terrain_card_preview_sprite.modulate = Color.RED

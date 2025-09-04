@@ -122,6 +122,10 @@ func _hero_attack():
 	var damage = _calculate_hero_damage()
 	var actual_damage = _apply_damage_to_enemy(damage)
 	
+	# 显示伤害效果
+	if battle_window:
+		battle_window.show_damage_effect("Enemy", actual_damage)
+	
 	damage_dealt.emit("Hero", enemy_data.name, actual_damage)
 	_add_battle_log("英雄攻击造成 " + str(actual_damage) + " 点伤害")
 	_add_battle_log(enemy_data.name + " 剩余生命值: " + str(enemy_data.hp))
@@ -134,6 +138,10 @@ func _enemy_attack():
 	
 	var damage = _calculate_enemy_damage()
 	var actual_damage = _apply_damage_to_hero(damage)
+	
+	# 显示伤害效果
+	if battle_window:
+		battle_window.show_damage_effect("Hero", actual_damage)
 	
 	damage_dealt.emit(enemy_data.name, "Hero", actual_damage)
 	_add_battle_log(enemy_data.name + " 攻击造成 " + str(actual_damage) + " 点伤害")

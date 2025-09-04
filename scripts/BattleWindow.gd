@@ -28,6 +28,7 @@ signal battle_window_closed
 @onready var close_button = $BattlePanel/CloseButton
 
 # 战斗数据
+var current_attacking_sprite: ColorRect  # 当前正在攻击的精灵引用
 var hero_data: Dictionary = {}
 var enemy_data: Dictionary = {}
 var original_enemy_hp: int = 0
@@ -168,17 +169,56 @@ func _on_close_button_pressed():
 
 # 动画效果
 func show_attack_animation(attacker: String):
-	"""显示攻击动画 - 攻击者快速横移"""
+	"""显示攻击动画 - 攻击者横移攻击"""
 	var attacker_sprite = hero_sprite if attacker == "Hero" else enemy_sprite
+	
+	# 计算移动距离（向目标方向移动80像素，更明显）
+	var move_distance = 80
+	if attacker == "Enemy":
+		move_distance = -80  # 敌人向左移动
+	
+	# 保存原始状态
 	var original_position = attacker_sprite.position
+	var original_color = attacker_sprite.color
+	var original_modulate = attacker_sprite.modulate
+	var original_scale = attacker_sprite.scale
 	
-	# 计算移动方向：英雄向右移动，敌人向左移动
-	var move_direction = Vector2(30, 0) if attacker == "Hero" else Vector2(-30, 0)
+	print("[Attack Animation] Starting attack animation for ", attacker)
+	print("[Attack Animation] Original position: ", original_position)
+	print("[Attack Animation] Move distance: ", move_distance)
 	
-	# 创建攻击动画：快速移动到目标位置再回到原位
+	# 创建攻击动画：使用position实现横移
 	var attack_tween = create_tween()
-	attack_tween.tween_property(attacker_sprite, "position", original_position + move_direction, 0.1)
-	attack_tween.tween_property(attacker_sprite, "position", original_position, 0.1)
+	# 攻击时变亮并放大
+	attack_tween.parallel().tween_property(attacker_sprite, "modulate", Color(1.8, 1.8, 1.2, 1.0), 0.15)
+	attack_tween.parallel().tween_property(attacker_sprite, "scale", Vector2(1.2, 1.2), 0.15)
+	# 快速移动到目标位置（使用position实现横移）
+	attack_tween.parallel().tween_property(attacker_sprite, "position:x", original_position.x + move_distance, 0.2)
+	# 稍作停顿
+	attack_tween.tween_interval(0.15)
+	# 回到原始位置和状态
+	attack_tween.parallel().tween_property(attacker_sprite, "position", original_position, 0.25)
+	attack_tween.parallel().tween_property(attacker_sprite, "modulate", original_modulate, 0.25)
+	attack_tween.parallel().tween_property(attacker_sprite, "scale", original_scale, 0.25)
+	# 动画结束后确保所有属性重置
+	attack_tween.tween_callback(_reset_attack_animation.bind(attacker_sprite, original_position, original_color, original_modulate, original_scale))
+
+func _reset_sprite_pivot(sprite: ColorRect, original_pivot: Vector2):
+	"""重置精灵pivot_offset"""
+	sprite.pivot_offset = original_pivot
+
+func _reset_attack_animation(sprite: ColorRect, original_position: Vector2, original_color: Color, original_modulate: Color, original_scale: Vector2):
+	"""重置攻击动画的所有属性"""
+	sprite.position = original_position
+	sprite.color = original_color
+	sprite.modulate = original_modulate
+	sprite.scale = original_scale
+	print("[Attack Animation] Animation reset completed")
+
+func _restore_sprite_color(sprite: ColorRect, original_color: Color, original_modulate: Color = Color.WHITE):
+	"""恢复精灵原始颜色和调制"""
+	sprite.color = original_color
+	sprite.modulate = original_modulate
 
 func show_damage_effect(target: String, damage: int):
 	"""显示伤害效果"""
@@ -197,11 +237,18 @@ func show_damage_effect(target: String, damage: int):
 	tween.parallel().tween_property(damage_label, "modulate:a", 0.0, 1.0)
 	tween.tween_callback(damage_label.queue_free)
 	
+	# 保存原始颜色和调制
+	var original_color = target_sprite.color
+	var original_modulate = target_sprite.modulate
+	
 	# 目标闪烁效果
 	var flash_tween = create_tween()
+	flash_tween.tween_property(target_sprite, "modulate", Color.RED, 0.1)
 	flash_tween.tween_property(target_sprite, "modulate", Color.WHITE, 0.1)
 	flash_tween.tween_property(target_sprite, "modulate", Color.RED, 0.1)
 	flash_tween.tween_property(target_sprite, "modulate", Color.WHITE, 0.1)
+	# 确保恢复到原始颜色和调制
+	flash_tween.tween_callback(_restore_sprite_color.bind(target_sprite, original_color, original_modulate))
 
 func show_heal_effect(target: String, heal: int):
 	"""显示治疗效果"""
@@ -220,8 +267,15 @@ func show_heal_effect(target: String, heal: int):
 	tween.parallel().tween_property(heal_label, "modulate:a", 0.0, 1.0)
 	tween.tween_callback(heal_label.queue_free)
 	
+	# 保存原始颜色和调制
+	var original_color = target_sprite.color
+	var original_modulate = target_sprite.modulate
+	
 	# 目标闪烁效果
 	var flash_tween = create_tween()
+	flash_tween.tween_property(target_sprite, "modulate", Color.GREEN, 0.1)
 	flash_tween.tween_property(target_sprite, "modulate", Color.WHITE, 0.1)
 	flash_tween.tween_property(target_sprite, "modulate", Color.GREEN, 0.1)
 	flash_tween.tween_property(target_sprite, "modulate", Color.WHITE, 0.1)
+	# 确保恢复到原始颜色和调制
+	flash_tween.tween_callback(_restore_sprite_color.bind(target_sprite, original_color, original_modulate))

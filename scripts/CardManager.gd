@@ -99,6 +99,55 @@ func _initialize_card_database():
 		"name": "草地",
 		"type": CardType.TERRAIN,
 		"rarity": CardRarity.COMMON,
+		"description": "提供少量食物资源",
+		"effects": {"food_bonus": 1},
+		"placement_type": "roadside"
+	}
+	
+	# 新增的buff地形卡牌
+	card_database["bamboo_forest"] = {
+		"id": "bamboo_forest",
+		"name": "竹林",
+		"type": CardType.TERRAIN,
+		"rarity": CardRarity.RARE,
+		"description": "放置时角色攻击+5，每天攻击+1",
+		"effects": {
+			"initial_attack_bonus": 5,
+			"daily_attack_bonus": 1
+		},
+		"placement_type": "roadside"
+	}
+	
+	card_database["mountain_peak"] = {
+		"id": "mountain_peak",
+		"name": "山峰",
+		"type": CardType.TERRAIN,
+		"rarity": CardRarity.RARE,
+		"description": "放置时角色生命上限+10，每天恢复10点血量",
+		"effects": {
+			"initial_max_hp_bonus": 10,
+			"daily_heal": 10
+		},
+		"placement_type": "roadside"
+	}
+	
+	card_database["river"] = {
+		"id": "river",
+		"name": "河流",
+		"type": CardType.TERRAIN,
+		"rarity": CardRarity.UNCOMMON,
+		"description": "每块河流提供1%经验加成",
+		"effects": {
+			"experience_bonus_percent": 1
+		},
+		"placement_type": "roadside"
+	}
+	
+	card_database["old_meadow"] = {
+		"id": "old_meadow",
+		"name": "旧草地",
+		"type": CardType.TERRAIN,
+		"rarity": CardRarity.COMMON,
 		"description": "每完成一圈获得1食物",
 		"effects": {"food_per_loop": 1},
 		"placement_type": "roadside"
