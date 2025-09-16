@@ -699,6 +699,14 @@ func _create_terrain_card_preview():
 			color = Color.GRAY
 		"river":
 			color = Color.BLUE
+		"rock":
+			color = Color.DARK_GRAY
+		"forest":
+			color = Color.FOREST_GREEN
+		"meadow":
+			color = Color.YELLOW_GREEN
+		"old_meadow":
+			color = Color.OLIVE
 		_:
 			color = Color.WHITE
 	

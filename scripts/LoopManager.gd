@@ -41,6 +41,7 @@ var step_count: int = 0  # 步数计数器
 
 # 网格地图状态
 var grid_terrain_cards: Dictionary = {}  # Vector2i(grid_x, grid_y) -> terrain_card_data
+var grid_terrain_sprites: Dictionary = {}  # Vector2i(grid_x, grid_y) -> ColorRect节点
 var grid_visual_node: Node2D  # 网格可视化节点
 var placeable_highlights = []  # 可放置区域高亮精灵列表
 
@@ -738,29 +739,45 @@ func can_place_terrain_at_grid_position(grid_pos: Vector2i) -> bool:
 func world_position_to_grid_position(world_pos: Vector2) -> Vector2i:
 	"""将世界坐标转换为TileMapLayer瓦片坐标"""
 	if not tile_map_layer:
+		print("[LoopManager] 错误：tile_map_layer为空")
 		return Vector2i(0, 0)
+	
+	print("[LoopManager] 坐标转换 - 输入世界坐标:", world_pos)
+	print("[LoopManager] LoopManager位置:", position)
+	print("[LoopManager] TileMapLayer位置:", tile_map_layer.position)
+	print("[LoopManager] TileMapLayer缩放:", tile_map_layer.scale)
 	
 	# 将世界坐标转换为相对于TileMapLayer的本地坐标
 	var local_pos = world_pos - position - tile_map_layer.position
+	print("[LoopManager] 本地坐标:", local_pos)
 	
 	# 使用TileMapLayer的local_to_map方法进行坐标转换
 	var tile_pos = tile_map_layer.local_to_map(local_pos / tile_map_layer.scale)
+	print("[LoopManager] 转换后的瓦片坐标:", tile_pos)
 	
 	return tile_pos
 
 func grid_position_to_world_position(grid_pos: Vector2i) -> Vector2:
 	"""将TileMapLayer瓦片坐标转换为世界坐标"""
 	if not tile_map_layer:
+		print("[LoopManager] 错误：tile_map_layer为空")
 		return Vector2.ZERO
+	
+	print("[LoopManager] 反向坐标转换 - 输入网格坐标:", grid_pos)
 	
 	# 使用TileMapLayer的map_to_local方法进行坐标转换
 	var local_pos = tile_map_layer.map_to_local(grid_pos)
+	print("[LoopManager] 本地坐标:", local_pos)
 	
 	# 应用TileMapLayer的变换（缩放和位置）
 	var transformed_pos = local_pos * tile_map_layer.scale + tile_map_layer.position
+	print("[LoopManager] 变换后坐标:", transformed_pos)
 	
 	# 转换为世界坐标
-	return transformed_pos + position
+	var world_pos = transformed_pos + position
+	print("[LoopManager] 最终世界坐标:", world_pos)
+	
+	return world_pos
 
 func place_terrain_card(tile_index: int, card_data: Dictionary):
 	"""在指定瓦片放置地形卡牌（旧版本，保持兼容性）"""
@@ -806,6 +823,14 @@ func _create_terrain_visual(tile_index: int, card_data: Dictionary):
 			color = Color.GRAY
 		"river":
 			color = Color.BLUE
+		"rock":
+			color = Color.DARK_GRAY
+		"forest":
+			color = Color.FOREST_GREEN
+		"meadow":
+			color = Color.YELLOW_GREEN
+		"old_meadow":
+			color = Color.OLIVE
 		_:
 			color = Color.WHITE
 	
@@ -831,59 +856,101 @@ func _create_terrain_visual(tile_index: int, card_data: Dictionary):
 	get_meta("terrain_sprites")[tile_index] = terrain_sprite
 
 func _create_terrain_visual_at_grid(grid_pos: Vector2i, card_data: Dictionary):
-	# 直接在TileMapLayer上设置地形瓦片，而不是创建额外的精灵
+	"""创建地形卡牌的视觉表示（基于TileMapLayer网格）"""
+	print("[LoopManager] 开始创建地形视觉 - 网格位置:", grid_pos, "卡牌:", card_data.name)
+	
+	# 检查TileMapLayer是否存在
 	if not tile_map_layer:
+		print("[LoopManager] 错误: TileMapLayer为空!")
 		return
 	
-	# 根据地形类型选择对应的瓦片atlas坐标，使用不同颜色的瓦片表示不同地形
-	var terrain_atlas_coords: Vector2i
+	# 转换网格位置到世界坐标
+	var world_pos = grid_position_to_world_position(grid_pos)
+	print("[LoopManager] 世界坐标:", world_pos)
+	
+	# 获取实际的瓦片大小
+	var size = _get_actual_tile_size()
+	print("[LoopManager] 瓦片大小:", size)
+	
+	# 创建一个ColorRect作为地形卡牌的视觉表示（更可靠）
+	var terrain_rect = ColorRect.new()
+	terrain_rect.name = "TerrainCard_" + str(grid_pos.x) + "_" + str(grid_pos.y)
+	
+	# 根据卡牌ID设置颜色
+	var color: Color
 	match card_data.id:
 		"bamboo_forest":
-			# 使用绿色瓦片 - 选择atlas中的绿色区域瓦片
-			terrain_atlas_coords = Vector2i(2, 1)  # 绿色瓦片
+			color = Color.GREEN
 		"mountain_peak":
-			# 使用灰色瓦片 - 选择atlas中的灰色区域瓦片
-			terrain_atlas_coords = Vector2i(3, 1)  # 灰色瓦片
+			color = Color.GRAY
 		"river":
-			# 使用蓝色瓦片 - 选择atlas中的蓝色区域瓦片
-			terrain_atlas_coords = Vector2i(1, 1)  # 蓝色瓦片
+			color = Color.BLUE
+		"rock":
+			color = Color.DARK_GRAY
+		"forest":
+			color = Color.FOREST_GREEN
+		"meadow":
+			color = Color.YELLOW_GREEN
+		"old_meadow":
+			color = Color.OLIVE
 		_:
-			# 默认使用白色空地瓦片
-			terrain_atlas_coords = Vector2i(5, 2)  # 白色空地瓦片
+			color = Color.WHITE
 	
-	# 在TileMapLayer上设置地形瓦片
-	tile_map_layer.set_cell(grid_pos, 0, terrain_atlas_coords)
+	print("[LoopManager] 设置颜色:", color, "对应卡牌ID:", card_data.id)
 	
-	# 创建文字标签显示卡牌名字的首字
-	var terrain_label = Label.new()
-	terrain_label.text = card_data.name.substr(0, 1)  # 获取名字的第一个字
-	terrain_label.add_theme_font_size_override("font_size", 20)
-	terrain_label.add_theme_color_override("font_color", Color.WHITE)
-	terrain_label.add_theme_color_override("font_shadow_color", Color.BLACK)
-	terrain_label.add_theme_constant_override("shadow_offset_x", 1)
-	terrain_label.add_theme_constant_override("shadow_offset_y", 1)
-	terrain_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	terrain_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	terrain_label.z_index = 1001  # 确保文字在瓦片之上
+	# 设置ColorRect属性 - 使用相对于LoopManager的本地坐标
+	terrain_rect.color = color
+	terrain_rect.size = Vector2(size, size)
+	# 将世界坐标转换为相对于LoopManager的本地坐标
+	var local_pos = world_pos - position
+	terrain_rect.position = local_pos - Vector2(size/2, size/2)  # 居中显示
+	terrain_rect.z_index = 5  # 在瓦片之上，但在高亮之下
 	
-	# 计算世界坐标位置
-	var world_pos = grid_position_to_world_position(grid_pos)
-	var tile_size = _get_actual_tile_size()
+	print("[LoopManager] ColorRect设置完成 - 本地位置:", terrain_rect.position, "大小:", terrain_rect.size, "z_index:", terrain_rect.z_index)
+	print("[LoopManager] LoopManager位置:", position, "世界坐标:", world_pos, "本地坐标:", local_pos)
 	
-	# 设置标签大小和位置
-	terrain_label.custom_minimum_size = Vector2(tile_size, tile_size)
-	terrain_label.size = Vector2(tile_size, tile_size)
-	terrain_label.position = world_pos - Vector2(tile_size/2, tile_size/2)
+	# 检查相机位置
+	var camera = get_viewport().get_camera_2d()
+	if camera:
+		print("[LoopManager] 相机位置:", camera.global_position, "缩放:", camera.zoom)
+		print("[LoopManager] ColorRect全局位置:", terrain_rect.global_position)
+	else:
+		print("[LoopManager] 警告: 未找到相机")
 	
 	# 添加到场景
-	add_child(terrain_label)
+	add_child(terrain_rect)
+	print("[LoopManager] ColorRect已添加到场景树，全局位置:", terrain_rect.global_position)
 	
-	# 存储标签引用以便后续移除
-	if not has_meta("terrain_labels"):
-		set_meta("terrain_labels", {})
-	get_meta("terrain_labels")[grid_pos] = terrain_label
+	# 创建文字标签
+	var terrain_label = Label.new()
+	terrain_label.name = "TerrainLabel_" + str(grid_pos.x) + "_" + str(grid_pos.y)
+	terrain_label.text = card_data.name.substr(0, 1)  # 获取名字的第一个字
+	terrain_label.add_theme_font_size_override("font_size", 24)
+	terrain_label.add_theme_color_override("font_color", Color.WHITE)
+	terrain_label.add_theme_color_override("font_shadow_color", Color.BLACK)
+	terrain_label.add_theme_constant_override("shadow_offset_x", 2)
+	terrain_label.add_theme_constant_override("shadow_offset_y", 2)
+	terrain_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	terrain_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	terrain_label.z_index = 6  # 确保文字在ColorRect之上
 	
-	print("[LoopManager] 在TileMapLayer位置", grid_pos, "设置地形瓦片：", card_data.name, "，atlas坐标：", terrain_atlas_coords, "，首字：", terrain_label.text)
+	# 设置标签大小与瓦片大小一致
+	terrain_label.size = Vector2(size, size)
+	terrain_label.position = Vector2(0, 0)  # 相对于父节点的位置
+	
+	# 将标签作为ColorRect的子节点
+	terrain_rect.add_child(terrain_label)
+	print("[LoopManager] 标签已添加到ColorRect")
+	
+	# 存储引用
+	grid_terrain_sprites[grid_pos] = terrain_rect
+	
+	print("[LoopManager] 地形卡牌视觉创建完成 - 网格位置:", grid_pos)
+	print("[LoopManager] 最终ColorRect全局位置:", terrain_rect.global_position, "可见性:", terrain_rect.visible)
+	
+	# 强制更新显示
+	terrain_rect.queue_redraw()
+	print("[LoopManager] 已请求重绘ColorRect")
 
 func get_terrain_at_tile(tile_index: int) -> Dictionary:
 	"""获取指定瓦片的地形卡牌数据"""
@@ -923,12 +990,10 @@ func remove_terrain_at_grid_position(grid_pos: Vector2i):
 		if tile_map_layer:
 			tile_map_layer.set_cell(grid_pos, 0, Vector2i(5, 2))  # 恢复为白色空地
 		
-		# 移除对应的文字标签
-		if has_meta("terrain_labels"):
-			var terrain_labels = get_meta("terrain_labels")
-			if grid_pos in terrain_labels:
-				terrain_labels[grid_pos].queue_free()
-				terrain_labels.erase(grid_pos)
+		# 移除对应的精灵
+		if grid_pos in grid_terrain_sprites:
+			grid_terrain_sprites[grid_pos].queue_free()
+			grid_terrain_sprites.erase(grid_pos)
 		
 		print("[LoopManager] 移除TileMapLayer位置", grid_pos, "的地形卡牌：", removed_card.name)
 	else:
@@ -944,8 +1009,14 @@ func _get_actual_tile_size() -> float:
 	if not tile_set:
 		return GRID_TILE_SIZE  # 如果没有TileSet，使用默认大小
 	
-	# 获取瓦片的基础大小
-	var base_tile_size = tile_set.tile_size.x  # 假设瓦片是正方形
+	# 获取瓦片的基础大小 - 从TileSetAtlasSource获取
+	var base_tile_size = 32.0  # 默认大小
+	
+	# 尝试从TileSet的源获取实际的瓦片大小
+	var source = tile_set.get_source(0)
+	if source and source is TileSetAtlasSource:
+		var atlas_source = source as TileSetAtlasSource
+		base_tile_size = atlas_source.texture_region_size.x  # 使用texture_region_size
 	
 	# 应用TileMapLayer的缩放
 	var actual_size = base_tile_size * tile_map_layer.scale.x
