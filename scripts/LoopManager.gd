@@ -1,5 +1,6 @@
 # LoopManager.gd
-# 循环管理器 - 负责英雄移动、循环路径管理、战斗触发等
+# 循环管理器 - 负责英雄移动、基于TileMapLayer的循环路径管理、战斗触发等
+# 从TileMapLayer中检测路径瓦片生成自定义路径
 class_name LoopManager
 extends Node2D
 
@@ -12,10 +13,9 @@ signal step_count_updated(step_count: int)
 signal day_changed(day: int)
 signal monsters_spawned(monster_positions: Array)
 
-# 循环路径配置
+# 路径配置
 const TILE_SIZE = 64
 const LOOP_RADIUS = 200
-const TILES_PER_LOOP = 12
 const MOVE_SPEED = 100.0
 
 # 网格地图配置
@@ -25,14 +25,8 @@ const GRID_TILE_SIZE = 16  # 每个网格瓦片的基础大小，与TileSet的te
 # 时间系统配置
 const STEPS_PER_DAY = 20
 
-# 路径类型枚举
-enum PathType {
-	CIRCULAR,	# 固定圆形路径
-	CUSTOM		# 从TileMapLayer读取的自定义路径
-}
-
-# 当前路径类型
-var current_path_type: PathType = PathType.CUSTOM
+# 路径类型：仅支持自定义瓦片路径
+# 从TileMapLayer中检测路径瓦片生成路径
 
 # 循环状态
 var current_tile_index: int = 0
@@ -121,28 +115,15 @@ func _ready():
 func _generate_loop_path():
 	"""生成循环路径的瓦片位置"""
 	loop_path.clear()
-	
-	match current_path_type:
-		PathType.CIRCULAR:
-			_generate_circular_path()
-		PathType.CUSTOM:
-			_generate_custom_path_from_tilemap()
-	
+	_generate_custom_path_from_tilemap()
 	print("Generated loop path with ", loop_path.size(), " positions")
 
-func _generate_circular_path():
-	"""生成固定圆形路径"""
-	for i in range(TILES_PER_LOOP):
-		var angle = (float(i) / TILES_PER_LOOP) * 2 * PI
-		var x = cos(angle) * LOOP_RADIUS
-		var y = sin(angle) * LOOP_RADIUS
-		loop_path.append(Vector2(x, y))
+
 
 func _generate_custom_path_from_tilemap():
 	"""从TileMapLayer读取自定义路径点"""
 	if not tile_map_layer:
-		print("Warning: TileMapLayer not found, falling back to circular path")
-		_generate_circular_path()
+		print("Error: TileMapLayer not found! Cannot generate path.")
 		return
 	
 	# 扫描TileMapLayer寻找路径瓦片
@@ -175,8 +156,7 @@ func _generate_custom_path_from_tilemap():
 		loop_path = path_points
 		print("Using custom path with ", loop_path.size(), " points")
 	else:
-		print("No custom path found in TileMapLayer, using circular path")
-		_generate_circular_path()
+		print("Error: No custom path found in TileMapLayer! Please add path tiles.")
 
 func _sort_path_points(points: Array[Vector2]):
 	"""对路径点进行排序，形成连续的循环路径"""
@@ -215,24 +195,9 @@ func _initialize_level1_map():
 		print("Warning: TileMapLayer not found!")
 		return
 	
-	# 当使用自定义路径时，保持TileMapLayer中已有的瓦片数据
-	if current_path_type == PathType.CUSTOM:
-		print("Using existing TileMapLayer data for custom path")
-		return
-	
-	# 只有在使用圆形路径时才创建新的瓦片数据
-	# 创建基础草地背景 (使用瓦片ID 0)
-	for x in range(-10, 11):
-		for y in range(-8, 9):
-			tile_map_layer.set_cell(Vector2i(x, y), 0, Vector2i(0, 0))
-	
-	# 在循环路径上放置路径瓦片 (使用瓦片ID 0，不同的atlas坐标)
-	for i in range(loop_path.size()):
-		var world_pos = loop_path[i]
-		var tile_pos = Vector2i(int(world_pos.x / TILE_SIZE), int(world_pos.y / TILE_SIZE))
-		tile_map_layer.set_cell(tile_pos, 0, Vector2i(25, 2))  # 路径瓦片
-	
-	print("Level 1 map initialized with basic terrain")
+	# 保持TileMapLayer中已有的瓦片数据
+	print("Using existing TileMapLayer data for custom path")
+	return
 
 func start_hero_movement():
 	"""开始英雄移动"""
@@ -476,7 +441,7 @@ func _generate_random_enemy() -> Dictionary:
 
 func place_card_at_tile(tile_index: int, card_data: Dictionary):
 	"""在指定瓦片放置卡牌"""
-	if tile_index >= 0 and tile_index < TILES_PER_LOOP:
+	if tile_index >= 0 and tile_index < loop_path.size():
 		placed_cards[tile_index] = card_data
 		print("Placed card '", card_data.name, "' at tile ", tile_index)
 		return true
@@ -518,6 +483,10 @@ func get_step_count() -> int:
 	"""获取当前步数"""
 	return step_count
 
+func get_path_length() -> int:
+	"""获取路径长度"""
+	return loop_path.size()
+
 func on_battle_ended(victory: bool, rewards: Dictionary = {}):
 	"""战斗结束处理"""
 	if victory:
@@ -544,19 +513,7 @@ func on_battle_window_closed():
 		is_moving = true
 		_move_to_next_tile()
 
-func set_path_type(path_type: PathType):
-	"""设置路径类型并重新生成路径"""
-	current_path_type = path_type
-	_generate_loop_path()
-	# 重置英雄位置
-	if loop_path.size() > 0:
-		hero_position = loop_path[0]
-		current_tile_index = 0
-		queue_redraw()
-	
-func get_path_type() -> PathType:
-	"""获取当前路径类型"""
-	return current_path_type
+# 路径类型相关函数已移除，现在只支持自定义瓦片路径
 
 func reset_loop():
 	"""重置循环状态"""
@@ -745,7 +702,7 @@ func _draw():
 func can_place_terrain_at_tile(tile_index: int) -> bool:
 	"""检查是否可以在指定瓦片放置地形卡牌（旧版本，保持兼容性）"""
 	# 检查索引是否有效
-	if tile_index < 0 or tile_index >= TILES_PER_LOOP:
+	if tile_index < 0 or tile_index >= loop_path.size():
 		return false
 	
 	# 检查是否已有地形卡牌
@@ -897,7 +854,36 @@ func _create_terrain_visual_at_grid(grid_pos: Vector2i, card_data: Dictionary):
 	# 在TileMapLayer上设置地形瓦片
 	tile_map_layer.set_cell(grid_pos, 0, terrain_atlas_coords)
 	
-	print("[LoopManager] 在TileMapLayer位置", grid_pos, "设置地形瓦片：", card_data.name, "，atlas坐标：", terrain_atlas_coords)
+	# 创建文字标签显示卡牌名字的首字
+	var terrain_label = Label.new()
+	terrain_label.text = card_data.name.substr(0, 1)  # 获取名字的第一个字
+	terrain_label.add_theme_font_size_override("font_size", 20)
+	terrain_label.add_theme_color_override("font_color", Color.WHITE)
+	terrain_label.add_theme_color_override("font_shadow_color", Color.BLACK)
+	terrain_label.add_theme_constant_override("shadow_offset_x", 1)
+	terrain_label.add_theme_constant_override("shadow_offset_y", 1)
+	terrain_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	terrain_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	terrain_label.z_index = 1001  # 确保文字在瓦片之上
+	
+	# 计算世界坐标位置
+	var world_pos = grid_position_to_world_position(grid_pos)
+	var tile_size = _get_actual_tile_size()
+	
+	# 设置标签大小和位置
+	terrain_label.custom_minimum_size = Vector2(tile_size, tile_size)
+	terrain_label.size = Vector2(tile_size, tile_size)
+	terrain_label.position = world_pos - Vector2(tile_size/2, tile_size/2)
+	
+	# 添加到场景
+	add_child(terrain_label)
+	
+	# 存储标签引用以便后续移除
+	if not has_meta("terrain_labels"):
+		set_meta("terrain_labels", {})
+	get_meta("terrain_labels")[grid_pos] = terrain_label
+	
+	print("[LoopManager] 在TileMapLayer位置", grid_pos, "设置地形瓦片：", card_data.name, "，atlas坐标：", terrain_atlas_coords, "，首字：", terrain_label.text)
 
 func get_terrain_at_tile(tile_index: int) -> Dictionary:
 	"""获取指定瓦片的地形卡牌数据"""
@@ -930,13 +916,23 @@ func get_terrain_at_grid_position(grid_pos: Vector2i) -> Dictionary:
 func remove_terrain_at_grid_position(grid_pos: Vector2i):
 	"""移除指定TileMapLayer瓦片位置的地形卡牌"""
 	if grid_pos in grid_terrain_cards:
+		var removed_card = grid_terrain_cards[grid_pos]
 		grid_terrain_cards.erase(grid_pos)
 		
 		# 在TileMapLayer上恢复为白色空地瓦片
 		if tile_map_layer:
 			tile_map_layer.set_cell(grid_pos, 0, Vector2i(5, 2))  # 恢复为白色空地
-	
-	print("[LoopManager] 移除TileMapLayer位置", grid_pos, "的地形卡牌")
+		
+		# 移除对应的文字标签
+		if has_meta("terrain_labels"):
+			var terrain_labels = get_meta("terrain_labels")
+			if grid_pos in terrain_labels:
+				terrain_labels[grid_pos].queue_free()
+				terrain_labels.erase(grid_pos)
+		
+		print("[LoopManager] 移除TileMapLayer位置", grid_pos, "的地形卡牌：", removed_card.name)
+	else:
+		print("[LoopManager] TileMapLayer位置", grid_pos, "没有地形卡牌可移除")
 
 func _get_actual_tile_size() -> float:
 	"""获取TileMapLayer的实际瓦片大小"""

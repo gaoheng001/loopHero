@@ -4,44 +4,44 @@ class_name MainGameController
 extends Node2D
 
 # 管理器引用
-@onready var game_manager: Node = $../GameManager
-@onready var loop_manager: Node = $../LoopManager
-@onready var card_manager: Node = $../CardManager
-@onready var hero_manager: Node = $../HeroManager
-@onready var battle_manager: Node = $../BattleManager
+var game_manager: Node
+var loop_manager: Node
+var card_manager: Node
+var hero_manager: Node
+var battle_manager: Node
 
 # UI引用
 # 时间系统UI
-@onready var day_label = $UI/MainUI/TopPanel/TimeContainer/DayLabel
-@onready var step_progress_bar = $UI/MainUI/TopPanel/TimeContainer/StepProgressBar
-@onready var step_label_time = $UI/MainUI/TopPanel/TimeContainer/StepLabel
+var day_label
+var step_progress_bar
+var step_label_time
 
 # 资源UI
-@onready var resources_container = $UI/MainUI/TopPanel/ResourcesContainer
-@onready var wood_label = $UI/MainUI/TopPanel/ResourcesContainer/WoodLabel
-@onready var stone_label = $UI/MainUI/TopPanel/ResourcesContainer/StoneLabel
-@onready var metal_label = $UI/MainUI/TopPanel/ResourcesContainer/MetalLabel
-@onready var food_label = $UI/MainUI/TopPanel/ResourcesContainer/FoodLabel
+var resources_container
+var wood_label
+var stone_label
+var metal_label
+var food_label
 
-@onready var loop_label = $UI/MainUI/BottomPanel/StatusContainer/LoopLabel
-@onready var state_label = $UI/MainUI/BottomPanel/StatusContainer/StateLabel
+var loop_label
+var state_label
 
-@onready var start_button = $UI/MainUI/BottomPanel/ControlsContainer/StartButton
-@onready var retreat_button = $UI/MainUI/BottomPanel/ControlsContainer/RetreatButton
-@onready var pause_button = $UI/MainUI/BottomPanel/ControlsContainer/PauseButton
+var start_button
+var retreat_button
+var pause_button
 
-@onready var level_label = $UI/MainUI/TopPanel/HeroPanel/HeroContainer/LevelLabel
-@onready var hp_label = $UI/MainUI/TopPanel/HeroPanel/HeroContainer/HPLabel
-@onready var step_label = $UI/MainUI/TopPanel/HeroPanel/HeroContainer/StepLabel
+var level_label
+var hp_label
+var step_label
 
-@onready var log_text = $UI/MainUI/LogPanel/LogContainer/LogScrollContainer/LogText
-@onready var hand_container = $UI/MainUI/BottomPanel/HandPanel/HandContainer
+var log_text
+var hand_container
 
 # 战斗窗口引用
-@onready var battle_window = $UI/BattleWindow
+var battle_window
 
 # 卡牌选择窗口引用
-@onready var card_selection_window = $UI/CardSelectionWindow
+var card_selection_window
 
 # 卡牌UI
 var hand_card_scenes: Array[Control] = []
@@ -53,6 +53,9 @@ var hovered_tile_index: int = -1
 
 func _ready():
 	print("[MainGameController] _ready function called!")
+	# 设置管理器引用（必须先设置引用）
+	_setup_manager_references()
+	
 	# 连接管理器信号
 	_connect_manager_signals()
 	
@@ -62,15 +65,13 @@ func _ready():
 	# 初始化UI
 	_initialize_ui()
 	
-	# 设置管理器引用
-	_setup_manager_references()
-	
 	print("Main Game Controller initialized")
 	
-	# 自动开始游戏用于测试
-	print("[MainGameController] About to wait for process_frame and call _on_start_button_pressed")
-	await get_tree().process_frame
-	print("[MainGameController] Process frame completed, calling _on_start_button_pressed")
+	# 添加测试：延迟5秒后自动测试开始按钮
+	print("[MainGameController] Ready for user interaction")
+	print("[MainGameController] Will test start button in 5 seconds...")
+	await get_tree().create_timer(5.0).timeout
+	print("[MainGameController] Testing start button now...")
 	_on_start_button_pressed()
 
 func _connect_manager_signals():
@@ -137,6 +138,42 @@ func _initialize_ui():
 
 func _setup_manager_references():
 	"""设置管理器之间的引用"""
+	# 手动获取管理器节点引用
+	game_manager = get_node("GameManager")
+	loop_manager = get_node("LoopManager")
+	card_manager = get_node("CardManager")
+	hero_manager = get_node("HeroManager")
+	battle_manager = get_node("BattleManager")
+	
+	# 手动获取UI节点引用
+	day_label = get_node("UI/MainUI/TopPanel/TimeContainer/DayLabel")
+	step_progress_bar = get_node("UI/MainUI/TopPanel/TimeContainer/StepProgressBar")
+	step_label_time = get_node("UI/MainUI/TopPanel/TimeContainer/StepLabel")
+	
+	wood_label = get_node("UI/MainUI/TopPanel/ResourcesContainer/WoodLabel")
+	stone_label = get_node("UI/MainUI/TopPanel/ResourcesContainer/StoneLabel")
+	metal_label = get_node("UI/MainUI/TopPanel/ResourcesContainer/MetalLabel")
+	food_label = get_node("UI/MainUI/TopPanel/ResourcesContainer/FoodLabel")
+	
+	loop_label = get_node("UI/MainUI/BottomPanel/StatusContainer/LoopLabel")
+	state_label = get_node("UI/MainUI/BottomPanel/StatusContainer/StateLabel")
+	
+	start_button = get_node("UI/MainUI/BottomPanel/ControlsContainer/StartButton")
+	retreat_button = get_node("UI/MainUI/BottomPanel/ControlsContainer/RetreatButton")
+	pause_button = get_node("UI/MainUI/BottomPanel/ControlsContainer/PauseButton")
+	
+	level_label = get_node("UI/MainUI/TopPanel/HeroPanel/HeroContainer/LevelLabel")
+	hp_label = get_node("UI/MainUI/TopPanel/HeroPanel/HeroContainer/HPLabel")
+	step_label = get_node("UI/MainUI/TopPanel/HeroPanel/HeroContainer/StepLabel")
+	
+	log_text = get_node("UI/MainUI/LogPanel/LogContainer/LogScrollContainer/LogText")
+	hand_container = get_node("UI/MainUI/BottomPanel/HandPanel/HandContainer")
+	
+	battle_window = get_node("UI/BattleWindow")
+	card_selection_window = get_node("UI/CardSelectionWindow")
+	
+	print("[MainGameController] All node references set up successfully")
+	
 	# 设置BattleManager的引用
 	battle_manager.hero_manager = hero_manager
 	battle_manager.loop_manager = loop_manager
@@ -185,7 +222,8 @@ func _on_loop_completed(loop_number: int):
 func _on_loop_manager_loop_completed():
 	"""循环管理器循环完成"""
 	# 应用循环完成时的卡牌效果
-	for tile_index in range(loop_manager.TILES_PER_LOOP):
+	var path_length = loop_manager.get_path_length()
+	for tile_index in range(path_length):
 		var card_data = loop_manager.get_card_at_tile(tile_index)
 		if card_data.size() > 0:
 			card_manager.apply_card_effects(card_data, "on_loop_complete")
@@ -286,14 +324,22 @@ func _on_experience_gained(amount: int):
 func _on_start_button_pressed():
 	"""开始按钮点击"""
 	print("[MainGameController] _on_start_button_pressed called!")
-	if game_manager.has_method("start_new_loop"):
+	print("[MainGameController] game_manager exists: ", game_manager != null)
+	print("[MainGameController] loop_manager exists: ", loop_manager != null)
+	
+	if game_manager and game_manager.has_method("start_new_loop"):
 		print("[MainGameController] Calling game_manager.start_new_loop()")
 		game_manager.start_new_loop()
 		print("[MainGameController] Calling loop_manager.start_hero_movement()")
 		loop_manager.start_hero_movement()
 		_add_log("[color=cyan]开始新的循环冒险！[/color]")
+		print("[MainGameController] Start button processing completed successfully!")
 	else:
-		print("[MainGameController] ERROR: game_manager.start_new_loop method not found!")
+		print("[MainGameController] ERROR: game_manager.start_new_loop method not found or game_manager is null!")
+		if game_manager:
+			print("[MainGameController] Available game_manager methods: ", game_manager.get_method_list())
+		else:
+			print("[MainGameController] game_manager is null!")
 
 func _on_retreat_button_pressed():
 	"""撤退按钮点击"""
@@ -494,8 +540,9 @@ func _find_closest_tile(world_pos: Vector2) -> int:
 	"""找到最接近世界坐标的瓦片索引"""
 	var closest_index = -1
 	var closest_distance = 999999.0
+	var path_length = loop_manager.get_path_length()
 	
-	for i in range(loop_manager.TILES_PER_LOOP):
+	for i in range(path_length):
 		var tile_pos = loop_manager.get_tile_position(i)
 		var distance = world_pos.distance_to(tile_pos)
 		
@@ -590,6 +637,7 @@ func _on_battle_window_closed():
 # 卡牌选择窗口信号处理函数
 var selected_terrain_card: Dictionary = {}  # 存储选中的地形卡牌
 var terrain_card_preview_sprite: Sprite2D = null  # 地形卡牌预览精灵
+var terrain_card_preview_label: Label = null  # 地形卡牌预览文字标签
 
 func _on_card_selection_card_selected(card_data: Dictionary):
 	"""卡牌选择窗口中卡牌选择后的处理"""
@@ -671,14 +719,40 @@ func _create_terrain_card_preview():
 	# 添加到场景
 	add_child(terrain_card_preview_sprite)
 	
-	print("[MainGameController] 创建地形卡牌预览：", selected_terrain_card.name)
+	# 创建文字标签显示卡牌名字的首字
+	terrain_card_preview_label = Label.new()
+	terrain_card_preview_label.text = selected_terrain_card.name.substr(0, 1)  # 获取名字的第一个字
+	terrain_card_preview_label.add_theme_font_size_override("font_size", 24)
+	terrain_card_preview_label.add_theme_color_override("font_color", Color.WHITE)
+	terrain_card_preview_label.add_theme_color_override("font_shadow_color", Color.BLACK)
+	terrain_card_preview_label.add_theme_constant_override("shadow_offset_x", 2)
+	terrain_card_preview_label.add_theme_constant_override("shadow_offset_y", 2)
+	terrain_card_preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	terrain_card_preview_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	terrain_card_preview_label.z_index = 1001  # 确保文字在精灵之上
+	
+	# 设置标签大小与瓦片大小一致
+	terrain_card_preview_label.custom_minimum_size = Vector2(size, size)
+	terrain_card_preview_label.size = Vector2(size, size)
+	
+	# 将标签作为精灵的子节点，这样它们会一起移动
+	terrain_card_preview_sprite.add_child(terrain_card_preview_label)
+	
+	# 调整标签位置，使其居中显示在精灵上
+	terrain_card_preview_label.position = Vector2(-size/2, -size/2)
+	
+	print("[MainGameController] 创建地形卡牌预览：", selected_terrain_card.name, "，首字：", terrain_card_preview_label.text)
 
 func _remove_terrain_card_preview():
 	"""移除地形卡牌预览精灵"""
 	if terrain_card_preview_sprite:
 		terrain_card_preview_sprite.queue_free()
 		terrain_card_preview_sprite = null
-		print("[MainGameController] 移除地形卡牌预览")
+	
+	if terrain_card_preview_label:
+		terrain_card_preview_label = null  # 标签作为精灵的子节点会自动被清理
+	
+	print("[MainGameController] 移除地形卡牌预览")
 
 func _process(delta):
 	"""每帧更新"""
