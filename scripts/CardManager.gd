@@ -51,26 +51,26 @@ func _ready():
 func _initialize_card_database():
 	"""初始化卡牌数据库"""
 	# 敌人卡牌
-	card_database["goblin_camp"] = {
-		"id": "goblin_camp",
-		"name": "哥布林营地",
-		"type": CardType.ENEMY,
-		"rarity": CardRarity.COMMON,
-		"description": "生成哥布林敌人，提供少量资源",
-		"enemy_data": {"name": "Goblin", "hp": 25, "attack": 8, "defense": 2},
-		"rewards": {"wood": 2, "food": 1},
-		"placement_type": "path"
+	card_database["yaokou_camp"] = {
+		"id": "yaokou_camp",
+		"name": "妖寇营地",
+		"type": "enemy",
+		"description": "生成妖寇敌人，提供少量资源",
+		"enemy_data": {"name": "Yaokou", "hp": 25, "attack": 8, "defense": 2},
+		"rarity": "common",
+		"unlock_condition": "初始可用",
+		"terrain_effect": {"terrain": "plains", "effect": "+5% 资源掉落"}
 	}
 	
-	card_database["skeleton_crypt"] = {
-		"id": "skeleton_crypt",
-		"name": "骷髅墓穴",
-		"type": CardType.ENEMY,
-		"rarity": CardRarity.COMMON,
-		"description": "生成骷髅敌人，掉落骨头材料",
-		"enemy_data": {"name": "Skeleton", "hp": 20, "attack": 12, "defense": 1},
-		"rewards": {"stone": 3},
-		"placement_type": "path"
+	card_database["kugu_yinzong"] = {
+		"id": "kugu_yinzong",
+		"name": "枯骨阴冢",
+		"type": "enemy",
+		"description": "生成枯骨敌人，掉落骨材",
+		"enemy_data": {"name": "Kugu", "hp": 20, "attack": 12, "defense": 1},
+		"rarity": "uncommon",
+		"unlock_condition": "完成一次循环",
+		"terrain_effect": {"terrain": "yinzong", "effect": "+5% 暴击率"}
 	}
 	
 	# 地形卡牌
@@ -191,7 +191,7 @@ func _initialize_starter_deck():
 	
 	# 添加基础卡牌
 	for i in range(3):
-		player_deck.append(card_database["goblin_camp"].duplicate())
+		player_deck.append(card_database["yaokou_camp"].duplicate())
 	
 	for i in range(2):
 		player_deck.append(card_database["rock"].duplicate())

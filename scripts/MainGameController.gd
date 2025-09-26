@@ -196,7 +196,7 @@ func _on_game_state_changed(new_state: int):
 				start_button.disabled = true
 			if retreat_button:
 				retreat_button.disabled = false
-		2: # CAMP_MANAGEMENT
+		2: # SECT_MANAGEMENT
 			if start_button:
 				start_button.text = "开始循环"
 				start_button.disabled = false
@@ -385,8 +385,8 @@ func _update_game_state_display():
 		match game_manager.current_state:
 			1: # IN_LOOP
 				state_text = "循环中"
-			2: # CAMP_MANAGEMENT
-				state_text = "营地管理"
+			2: # SECT_MANAGEMENT
+				state_text = "宗门管理"
 			3: # PAUSED
 				state_text = "已暂停"
 			_:

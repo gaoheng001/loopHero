@@ -433,9 +433,9 @@ func _check_for_battle():
 func _generate_random_enemy() -> Dictionary:
 	"""生成随机敌人"""
 	var enemies = [
-		{"name": "Goblin", "hp": 20, "attack": 5, "defense": 2},
-		{"name": "Skeleton", "hp": 15, "attack": 7, "defense": 1},
-		{"name": "Spider", "hp": 12, "attack": 6, "defense": 0}
+		{"name": "Yaokou", "hp": 20, "attack": 5, "defense": 2},
+		{"name": "Kugu", "hp": 15, "attack": 7, "defense": 1},
+		{"name": "Zhumu", "hp": 12, "attack": 6, "defense": 0}
 	]
 	
 	return enemies[randi() % enemies.size()]
@@ -550,7 +550,7 @@ func _spawn_initial_monsters():
 		available_tiles.remove_at(random_index)
 		
 		# 创建怪物数据（初始怪物较弱）
-		var monster_types = ["Goblin", "Skeleton", "Spider"]
+		var monster_types = ["Yaokou", "Kugu", "Zhumu"]
 		var monster_type = monster_types[randi() % monster_types.size()]
 		var monster_data = {
 			"type": monster_type,
@@ -597,7 +597,7 @@ func _spawn_monsters_for_new_day():
 		available_tiles.remove_at(random_index)
 		
 		# 创建怪物数据
-		var monster_types = ["Goblin", "Skeleton", "Orc"]
+		var monster_types = ["Yaokou", "Kugu", "Manku"]
 		var monster_type = monster_types[randi() % monster_types.size()]
 		var monster_data = {
 			"type": monster_type,
@@ -629,7 +629,7 @@ func _create_monster_sprite(tile_index: int, monster_type: String):
 	else:
 		# 创建一个简单的彩色方块作为占位符
 		var image = Image.create(32, 32, false, Image.FORMAT_RGB8)
-		var color = Color.RED if monster_type == "Goblin" else (Color.BLUE if monster_type == "Skeleton" else (Color.GREEN if monster_type == "Orc" else Color.YELLOW))
+		var color = Color.RED if monster_type == "Yaokou" else (Color.BLUE if monster_type == "Kugu" else (Color.GREEN if monster_type == "Manku" else Color.YELLOW))
 		image.fill(color)
 		var texture = ImageTexture.new()
 		texture.set_image(image)
@@ -1289,3 +1289,4 @@ func hide_placeable_highlights():
 	print("[LoopManager] 隐藏了可放置区域高亮")
 
 		# 英雄现在使用Character_sword节点显示，不需要在这里绘制瓦片位置和英雄
+

@@ -133,7 +133,7 @@ func _initialize_skills():
 			skills = {
 				"dark_magic": {"level": 0, "max_level": 5, "description": "增加魔法攻击力"},
 				"life_drain": {"level": 0, "max_level": 5, "description": "攻击时吸取生命值"},
-				"summon_skeleton": {"level": 0, "max_level": 3, "description": "召唤骷髅助战"}
+				"summon_kugu": {"level": 0, "max_level": 3, "description": "召唤枯骨助战"}
 			}
 
 func _calculate_stats():

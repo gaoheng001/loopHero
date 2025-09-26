@@ -7,7 +7,7 @@ extends Node
 enum GameState {
 	MAIN_MENU,
 	IN_LOOP,
-	CAMP_MANAGEMENT,
+	SECT_MANAGEMENT,
 	PAUSED,
 	GAME_OVER
 }
@@ -72,7 +72,7 @@ func _on_game_state_changed(new_state: GameState):
 			_handle_main_menu()
 		GameState.IN_LOOP:
 			_handle_in_loop()
-		GameState.CAMP_MANAGEMENT:
+		GameState.SECT_MANAGEMENT:
 			_handle_camp_management()
 		GameState.PAUSED:
 			_handle_paused()
@@ -88,7 +88,7 @@ func _handle_in_loop():
 	get_tree().paused = false
 
 func _handle_camp_management():
-	"""处理营地管理状态"""
+	"""处理宗门管理状态"""
 	get_tree().paused = false
 
 func _handle_paused():
@@ -113,7 +113,7 @@ func complete_loop():
 func retreat_from_loop():
 	"""从循环中撤退"""
 	print("Retreating from loop #", loop_number)
-	change_state(GameState.CAMP_MANAGEMENT)
+	change_state(GameState.SECT_MANAGEMENT)
 
 func hero_death():
 	"""英雄死亡处理"""
