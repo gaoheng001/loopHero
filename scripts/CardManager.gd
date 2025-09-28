@@ -47,24 +47,12 @@ func _ready():
 	draw_cards(3)
 	
 	print("Card Manager initialized with ", card_database.size(), " cards in database")
-	print("[CardManager] 数据库中的卡牌ID列表: ", card_database.keys())
 	
 	# 验证特定卡牌是否存在
 	var test_cards = ["bamboo_forest", "mountain_peak", "river"]
 	for card_id in test_cards:
-		if card_id in card_database:
-			print("[CardManager] 卡牌 '", card_id, "' 存在于数据库中")
-		else:
-			print("[CardManager] 错误: 卡牌 '", card_id, "' 不存在于数据库中")
-	
-	# 自测试get_card_by_id方法
-	print("[CardManager] 开始自测试get_card_by_id方法...")
-	var test_result1 = get_card_by_id("bamboo_forest")
-	print("[CardManager] 自测试结果1: ", test_result1)
-	var test_result2 = get_card_by_id("mountain_peak")
-	print("[CardManager] 自测试结果2: ", test_result2)
-	var test_result3 = get_card_by_id("river")
-	print("[CardManager] 自测试结果3: ", test_result3)
+		if not card_id in card_database:
+			print("[CardManager] ERROR: 卡牌 '", card_id, "' 不存在于数据库中")
 
 func _initialize_card_database():
 	"""初始化卡牌数据库"""
@@ -312,26 +300,18 @@ func add_card_to_deck(card_id: String):
 
 func get_card_by_id(card_id: String) -> Dictionary:
 	"""根据ID获取卡牌数据"""
-	print("[CardManager] 尝试获取卡牌ID: ", card_id)
-	print("[CardManager] 数据库中的卡牌数量: ", card_database.size())
-	print("[CardManager] 数据库是否为空: ", card_database.is_empty())
-	print("[CardManager] 数据库中的卡牌ID列表: ", card_database.keys())
-	print("[CardManager] 检查卡牌ID '", card_id, "' 是否在数据库中: ", card_id in card_database)
-	
 	if card_database.is_empty():
-		print("[CardManager] 错误: 卡牌数据库为空！")
+		print("[CardManager] ERROR: 卡牌数据库为空！")
 		return {}
 	
 	if card_id.is_empty():
-		print("[CardManager] 错误: 卡牌ID为空")
+		print("[CardManager] ERROR: 卡牌ID为空")
 		return {}
 	
 	if card_id in card_database:
-		var card_data = card_database[card_id]
-		print("[CardManager] 成功获取卡牌数据: ", card_data)
-		return card_data
+		return card_database[card_id]
 	else:
-		print("[CardManager] 警告: 卡牌ID '", card_id, "' 不存在于数据库中")
+		print("[CardManager] WARNING: 卡牌ID '", card_id, "' 不存在于数据库中")
 		return {}
 
 func get_hand() -> Array[Dictionary]:

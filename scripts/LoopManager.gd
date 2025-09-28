@@ -202,23 +202,19 @@ func _initialize_level1_map():
 
 func start_hero_movement():
 	"""开始英雄移动"""
-	print("[LoopManager] start_hero_movement called!")
-	print("[LoopManager] Current is_moving state: ", is_moving)
-	print("[LoopManager] Hero node exists: ", hero_node != null)
-	print("[LoopManager] Loop path size: ", loop_path.size())
 	if not is_moving:
 		is_moving = true
-		print("[LoopManager] Setting is_moving to true")
-		# 确保Character_sword节点位于起始位置
+		# 只在英雄位置未初始化时才设置到起始位置
 		if hero_node and loop_path.size() > 0:
-			hero_node.position = loop_path[0]
-			hero_position = loop_path[0]
-			print("[LoopManager] Set hero position to: ", loop_path[0])
+			# 如果hero_position还没有初始化（Vector2.ZERO），则设置到起始位置
+			if hero_position == Vector2.ZERO:
+				hero_node.position = loop_path[0]
+				hero_position = loop_path[0]
+			else:
+				# 保持当前位置，确保hero_node与hero_position同步
+				hero_node.position = hero_position
 		queue_redraw()  # 初始绘制
-		print("[LoopManager] Calling _move_to_next_tile()")
 		_move_to_next_tile()
-	else:
-		print("[LoopManager] Hero is already moving, ignoring start request")
 
 func stop_hero_movement():
 	"""停止英雄移动"""
@@ -260,7 +256,6 @@ func _move_to_next_tile():
 	# 确保之前的 tween 被停止
 	if movement_tween:
 		movement_tween.kill()
-		print("[LoopManager] Killed previous tween")
 	
 	# 创建移动补间动画
 	movement_tween = create_tween()
@@ -742,18 +737,11 @@ func world_position_to_grid_position(world_pos: Vector2) -> Vector2i:
 		print("[LoopManager] 错误：tile_map_layer为空")
 		return Vector2i(0, 0)
 	
-	print("[LoopManager] 坐标转换 - 输入世界坐标:", world_pos)
-	print("[LoopManager] LoopManager位置:", position)
-	print("[LoopManager] TileMapLayer位置:", tile_map_layer.position)
-	print("[LoopManager] TileMapLayer缩放:", tile_map_layer.scale)
-	
 	# 将世界坐标转换为相对于TileMapLayer的本地坐标
 	var local_pos = world_pos - position - tile_map_layer.position
-	print("[LoopManager] 本地坐标:", local_pos)
 	
 	# 使用TileMapLayer的local_to_map方法进行坐标转换
 	var tile_pos = tile_map_layer.local_to_map(local_pos / tile_map_layer.scale)
-	print("[LoopManager] 转换后的瓦片坐标:", tile_pos)
 	
 	return tile_pos
 
@@ -763,19 +751,14 @@ func grid_position_to_world_position(grid_pos: Vector2i) -> Vector2:
 		print("[LoopManager] 错误：tile_map_layer为空")
 		return Vector2.ZERO
 	
-	print("[LoopManager] 反向坐标转换 - 输入网格坐标:", grid_pos)
-	
 	# 使用TileMapLayer的map_to_local方法进行坐标转换
 	var local_pos = tile_map_layer.map_to_local(grid_pos)
-	print("[LoopManager] 本地坐标:", local_pos)
 	
 	# 应用TileMapLayer的变换（缩放和位置）
 	var transformed_pos = local_pos * tile_map_layer.scale + tile_map_layer.position
-	print("[LoopManager] 变换后坐标:", transformed_pos)
 	
 	# 转换为世界坐标
 	var world_pos = transformed_pos + position
-	print("[LoopManager] 最终世界坐标:", world_pos)
 	
 	return world_pos
 
@@ -896,8 +879,6 @@ func _create_terrain_visual_at_grid(grid_pos: Vector2i, card_data: Dictionary):
 		_:
 			color = Color.WHITE
 	
-	print("[LoopManager] 设置颜色:", color, "对应卡牌ID:", card_data.id)
-	
 	# 设置ColorRect属性 - 使用相对于LoopManager的本地坐标
 	terrain_rect.color = color
 	terrain_rect.size = Vector2(size, size)
@@ -906,20 +887,13 @@ func _create_terrain_visual_at_grid(grid_pos: Vector2i, card_data: Dictionary):
 	terrain_rect.position = local_pos - Vector2(size/2, size/2)  # 居中显示
 	terrain_rect.z_index = 5  # 在瓦片之上，但在高亮之下
 	
-	print("[LoopManager] ColorRect设置完成 - 本地位置:", terrain_rect.position, "大小:", terrain_rect.size, "z_index:", terrain_rect.z_index)
-	print("[LoopManager] LoopManager位置:", position, "世界坐标:", world_pos, "本地坐标:", local_pos)
-	
 	# 检查相机位置
 	var camera = get_viewport().get_camera_2d()
-	if camera:
-		print("[LoopManager] 相机位置:", camera.global_position, "缩放:", camera.zoom)
-		print("[LoopManager] ColorRect全局位置:", terrain_rect.global_position)
-	else:
+	if not camera:
 		print("[LoopManager] 警告: 未找到相机")
 	
 	# 添加到场景
 	add_child(terrain_rect)
-	print("[LoopManager] ColorRect已添加到场景树，全局位置:", terrain_rect.global_position)
 	
 	# 创建文字标签
 	var terrain_label = Label.new()
@@ -1021,7 +995,6 @@ func _get_actual_tile_size() -> float:
 	# 应用TileMapLayer的缩放
 	var actual_size = base_tile_size * tile_map_layer.scale.x
 	
-	print("[LoopManager] TileMapLayer实际瓦片大小: ", actual_size, "像素 (基础大小: ", base_tile_size, ", 缩放: ", tile_map_layer.scale.x, ")")
 	return actual_size
 
 func _create_grid_visualization():
