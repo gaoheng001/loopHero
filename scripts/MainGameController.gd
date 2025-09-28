@@ -69,10 +69,9 @@ func _ready():
 	
 	# 添加测试：延迟5秒后自动测试开始按钮
 	print("[MainGameController] Ready for user interaction")
-	print("[MainGameController] Will test start button in 5 seconds...")
-	await get_tree().create_timer(5.0).timeout
-	print("[MainGameController] Testing start button now...")
-	_on_start_button_pressed()
+	
+	# 启动持续监控，观察第4天第19步的行为
+	_start_continuous_monitoring()
 
 func _connect_manager_signals():
 	"""连接管理器信号"""
@@ -138,12 +137,44 @@ func _initialize_ui():
 
 func _setup_manager_references():
 	"""设置管理器之间的引用"""
+	print("[MainGameController] Setting up manager references...")
+	print("[MainGameController] Current node name: ", name)
+	print("[MainGameController] Current node children count: ", get_child_count())
+	
+	# 打印所有子节点
+	for i in range(get_child_count()):
+		var child = get_child(i)
+		print("[MainGameController] Child ", i, ": ", child.name, " (", child.get_class(), ")")
+	
 	# 手动获取管理器节点引用
-	game_manager = get_node("GameManager")
-	loop_manager = get_node("LoopManager")
-	card_manager = get_node("CardManager")
-	hero_manager = get_node("HeroManager")
-	battle_manager = get_node("BattleManager")
+	game_manager = get_node_or_null("GameManager")
+	print("[MainGameController] GameManager found: ", game_manager != null)
+	if not game_manager:
+		print("Warning: GameManager not found!")
+	
+	loop_manager = get_node_or_null("LoopManager")
+	print("[MainGameController] LoopManager found: ", loop_manager != null)
+	if not loop_manager:
+		print("Warning: LoopManager not found!")
+	
+	card_manager = get_node_or_null("CardManager")
+	print("[MainGameController] CardManager found: ", card_manager != null)
+	if not card_manager:
+		print("Warning: CardManager not found!")
+	
+	hero_manager = get_node_or_null("HeroManager")
+	print("[MainGameController] HeroManager found: ", hero_manager != null)
+	if not hero_manager:
+		print("Warning: HeroManager not found!")
+		# 创建默认的HeroManager如果没有找到
+		hero_manager = preload("res://scripts/HeroManager.gd").new()
+		add_child(hero_manager)
+		print("Created default HeroManager")
+	
+	battle_manager = get_node_or_null("BattleManager")
+	print("[MainGameController] BattleManager found: ", battle_manager != null)
+	if not battle_manager:
+		print("Warning: BattleManager not found!")
 	
 	# 手动获取UI节点引用
 	day_label = get_node("UI/MainUI/TopPanel/TimeContainer/DayLabel")
@@ -641,14 +672,24 @@ var terrain_card_preview_label: Label = null  # 地形卡牌预览文字标签
 
 func _on_card_selection_card_selected(card_data: Dictionary):
 	"""卡牌选择窗口中卡牌选择后的处理"""
+	print("[MainGameController] _on_card_selection_card_selected called with card: ", card_data.name)
 	_add_log("[color=cyan]选择了卡牌：" + card_data.name + "[/color]")
 	
 	# 存储选中的卡牌数据
 	selected_terrain_card = card_data
+	print("[MainGameController] Stored selected_terrain_card: ", selected_terrain_card.name)
+	
+	# 在headless模式下自动放置卡牌
+	if DisplayServer.get_name() == "headless":
+		print("[MainGameController] Headless mode detected, auto-placing terrain card...")
+		_auto_place_terrain_card()
+		print("[MainGameController] Auto-place terrain card completed")
+		return
 	
 	# 开始拖拽放置模式
 	is_placing_card = true
 	selected_card_index = 0  # 临时索引
+	print("[MainGameController] Started card placement mode")
 	
 	# 创建地形卡牌预览精灵
 	_create_terrain_card_preview()
@@ -677,6 +718,7 @@ func _on_card_selection_closed():
 	# 恢复游戏移动
 	if loop_manager and not loop_manager.is_moving:
 		loop_manager.start_hero_movement()
+		_add_log("[color=cyan]游戏继续[/color]")
 
 func _create_terrain_card_preview():
 	"""创建地形卡牌预览精灵"""
@@ -778,6 +820,126 @@ func _process(delta):
 		if loop_manager.can_place_terrain_at_grid_position(grid_pos):
 			# 在有效位置时显示绿色
 			terrain_card_preview_sprite.modulate = Color.WHITE
+
+func _start_continuous_monitoring():
+	"""启动持续监控，观察第4天第19步的行为"""
+	print("[MainGameController] Starting continuous monitoring for Day 4 Step 19...")
+	_monitor_game_progress()
+
+func _monitor_game_progress():
+	"""监控游戏进度"""
+	var last_total_steps = -1
+	var last_day = -1
+	var last_step_in_day = -1
+	var stuck_count = 0
+	
+	while true:
+		await get_tree().create_timer(2.0).timeout  # 每2秒检查一次
+		
+		if loop_manager:
+			var current_day = loop_manager.current_day
+			var current_step = loop_manager.steps_in_current_day
+			var total_steps = loop_manager.step_count
+			var is_moving = loop_manager.is_moving
+			
+			# 检查游戏是否卡住
+			if total_steps == last_total_steps and current_day == last_day and current_step == last_step_in_day:
+				stuck_count += 1
+				if stuck_count >= 5:  # 如果10秒没有变化
+					print("[Monitor] GAME STUCK! Day: ", current_day, ", Step: ", current_step, ", Total: ", total_steps, ", Moving: ", is_moving)
+					stuck_count = 0
+			else:
+				stuck_count = 0
+				print("[Monitor] Day: ", current_day, ", Step in day: ", current_step, ", Total steps: ", total_steps, ", Moving: ", is_moving)
+			
+			# 更新上次状态
+			last_total_steps = total_steps
+			last_day = current_day
+			last_step_in_day = current_step
+			
+			# 重点监控第4天第19步
+			if current_day == 4 and current_step == 19:
+				print("[CRITICAL] Reached Day 4 Step 19!")
+				print("[CRITICAL] Current game state: ", game_manager.current_state if game_manager else "No GameManager")
+				print("[CRITICAL] Hero position: ", loop_manager.hero_position if loop_manager else "No LoopManager")
+				print("[CRITICAL] Is moving: ", loop_manager.is_moving if loop_manager else "No LoopManager")
+				
+				# 检查卡牌选择窗口状态
+				if card_selection_window:
+					print("[CRITICAL] Card selection window visible: ", card_selection_window.visible)
+				
+				# 等待5秒观察行为
+				await get_tree().create_timer(5.0).timeout
+				print("[CRITICAL] 5 seconds after Day 4 Step 19...")
+			
+			# 如果游戏运行超过5天，停止监控
+			if current_day > 5:
+				print("[Monitor] Game has run beyond Day 5, stopping monitoring.")
+				break
 		else:
 			# 在无效位置时显示红色
 			terrain_card_preview_sprite.modulate = Color.RED
+
+func _auto_place_terrain_card():
+	"""在headless模式下自动放置地形卡牌"""
+	print("[MainGameController] Auto-placing terrain card: ", selected_terrain_card.name)
+	print("[MainGameController] loop_manager exists: ", loop_manager != null)
+	print("[MainGameController] hero_manager exists: ", hero_manager != null)
+	
+	# 找到第一个可以放置地形的位置
+	var placed = false
+	var grid_size = 50  # 搜索范围
+	print("[MainGameController] Searching for placement position in grid size: ", grid_size)
+	
+	for x in range(-grid_size, grid_size):
+		for y in range(-grid_size, grid_size):
+			var grid_pos = Vector2i(x, y)
+			if loop_manager.can_place_terrain_at_grid_position(grid_pos):
+				print("[MainGameController] Found valid placement position: ", grid_pos)
+				# 尝试放置地形卡牌
+				if loop_manager.place_terrain_card_at_grid_position(grid_pos, selected_terrain_card):
+					print("[MainGameController] Successfully placed terrain card at: ", grid_pos)
+					# 应用地形卡牌效果到英雄
+					hero_manager.add_terrain_card(selected_terrain_card)
+					print("[MainGameController] Applied terrain card effect to hero")
+					
+					_add_log("[color=green]自动放置地形卡牌：" + selected_terrain_card.name + " 在位置 (" + str(grid_pos.x) + "," + str(grid_pos.y) + ")[/color]")
+					print("[MainGameController] Successfully auto-placed terrain card at grid position: ", grid_pos)
+					
+					# 清除选择状态
+					selected_terrain_card.clear()
+					is_placing_card = false
+					print("[MainGameController] Cleared card selection state")
+					
+					# 恢复游戏移动
+					if loop_manager and not loop_manager.is_moving:
+						print("[MainGameController] Resuming hero movement...")
+						loop_manager.start_hero_movement()
+						_add_log("[color=cyan]游戏继续[/color]")
+						print("[MainGameController] Hero movement resumed")
+					else:
+						print("[MainGameController] Hero is already moving or loop_manager is null")
+					
+					placed = true
+					break
+			
+		if placed:
+			break
+	
+	if not placed:
+		print("[MainGameController] Failed to auto-place terrain card, skipping...")
+		_add_log("[color=red]无法自动放置地形卡牌，跳过[/color]")
+		
+		# 清除选择状态
+		selected_terrain_card.clear()
+		is_placing_card = false
+		print("[MainGameController] Cleared card selection state after failure")
+		
+		# 恢复游戏移动
+		if loop_manager and not loop_manager.is_moving:
+			print("[MainGameController] Resuming hero movement after placement failure...")
+			loop_manager.start_hero_movement()
+			_add_log("[color=cyan]游戏继续[/color]")
+			print("[MainGameController] Hero movement resumed after placement failure")
+		else:
+			print("[MainGameController] Hero is already moving or loop_manager is null after placement failure")
