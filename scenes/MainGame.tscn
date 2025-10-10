@@ -2337,6 +2337,7 @@ offset_right = 200.0
 offset_bottom = 50.0
 grow_horizontal = 2
 grow_vertical = 0
+visible = false
 
 [node name="HandContainer" type="HBoxContainer" parent="UI/MainUI/BottomPanel/HandPanel"]
 layout_mode = 1

@@ -126,19 +126,19 @@ func _connect_ui_signals():
 	pause_button.pressed.connect(_on_pause_button_pressed)
 
 func _initialize_ui():
-	"""初始化UI"""
-	# 更新资源显示
-	_update_resources_display()
-	
-	# 更新英雄信息
-	_update_hero_display()
-	
-	# 更新时间系统显示
-	_update_time_display()
-	
-	# 更新游戏状态
-	_update_game_state_display()
-	
+    """初始化UI"""
+    # 更新资源显示
+    _update_resources_display()
+    
+    # 更新英雄信息
+    _update_hero_display()
+    
+    # 更新时间系统显示
+    _update_time_display()
+    
+    # 更新游戏状态
+    _update_game_state_display()
+
 	# 初始化战斗日志
 	if log_text:
 		log_text.text = "[color=gray]等待游戏开始...[/color]"
@@ -342,8 +342,8 @@ func _on_battle_log_updated(message: String):
 	_add_log(message)
 
 func _on_hand_updated(new_hand: Array):
-	"""手牌更新"""
-	_update_hand_display()
+    """手牌更新"""
+    pass
 
 func _on_card_placed(card_data: Dictionary, position: Vector2):
 	"""卡牌放置"""
