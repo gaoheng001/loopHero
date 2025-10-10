@@ -22,6 +22,7 @@ var wood_label
 var stone_label
 var metal_label
 var food_label
+var spirit_label
 
 var loop_label
 var state_label
@@ -55,61 +56,68 @@ func _ready():
 	print("[MainGameController] _ready function called!")
 	# 设置管理器引用（必须先设置引用）
 	_setup_manager_references()
-	
+
 	# 连接管理器信号
 	_connect_manager_signals()
-	
+
 	# 连接UI信号
 	_connect_ui_signals()
-	
+
 	# 初始化UI
 	_initialize_ui()
-	
+
 	print("Main Game Controller initialized")
-	
+
 	# 添加测试：延迟5秒后自动测试开始按钮
 	print("[MainGameController] Ready for user interaction")
-	
+
 	# 启动持续监控，观察第4天第19步的行为
+
+	# 无交互环境下自动启动游戏，避免卡在 Day:1 Step:0
+	if game_manager and loop_manager:
+		if not loop_manager.is_moving:
+			print("[MainGameController] Auto-starting loop...")
+			_on_start_button_pressed()
 	_start_continuous_monitoring()
 
 func _connect_manager_signals():
 	"""连接管理器信号"""
 	# GameManager信号
-	game_manager.game_state_changed.connect(_on_game_state_changed)
-	game_manager.resources_changed.connect(_on_resources_changed)
-	game_manager.loop_completed.connect(_on_loop_completed)
+	game_manager.connect("game_state_changed", Callable(self, "_on_game_state_changed"))
+	game_manager.connect("resources_changed", Callable(self, "_on_resources_changed"))
+	game_manager.connect("loop_completed", Callable(self, "_on_loop_completed"))
 	
 	# LoopManager信号
-	loop_manager.hero_moved.connect(_on_hero_moved)
-	loop_manager.battle_started.connect(_on_battle_started)
-	loop_manager.loop_completed.connect(_on_loop_manager_loop_completed)
-	loop_manager.step_count_updated.connect(_on_step_count_updated)
-	loop_manager.day_changed.connect(_on_day_changed)
-	loop_manager.monsters_spawned.connect(_on_monsters_spawned)
+	loop_manager.connect("hero_moved", Callable(self, "_on_hero_moved"))
+	loop_manager.connect("battle_started", Callable(self, "_on_battle_started"))
+	loop_manager.connect("loop_completed", Callable(self, "_on_loop_manager_loop_completed"))
+	loop_manager.connect("step_count_updated", Callable(self, "_on_step_count_updated"))
+	loop_manager.connect("day_changed", Callable(self, "_on_day_changed"))
+	loop_manager.connect("monsters_spawned", Callable(self, "_on_monsters_spawned"))
 	
 	# CardManager信号
-	card_manager.hand_updated.connect(_on_hand_updated)
-	card_manager.card_placed.connect(_on_card_placed)
+	# 使用字符串信号连接以避免属性访问错误
+	card_manager.connect("hand_updated", Callable(self, "_on_hand_updated"))
+	card_manager.connect("card_placed", Callable(self, "_on_card_placed"))
 	
 	# HeroManager信号
-	hero_manager.hero_stats_changed.connect(_on_hero_stats_changed)
-	hero_manager.hero_leveled_up.connect(_on_hero_leveled_up)
-	hero_manager.experience_gained.connect(_on_experience_gained)
+	hero_manager.connect("hero_stats_changed", Callable(self, "_on_hero_stats_changed"))
+	hero_manager.connect("hero_leveled_up", Callable(self, "_on_hero_leveled_up"))
+	hero_manager.connect("experience_gained", Callable(self, "_on_experience_gained"))
 	
 	# BattleManager信号
-	battle_manager.battle_started.connect(_on_battle_manager_battle_started)
-	battle_manager.battle_ended.connect(_on_battle_ended)
-	battle_manager.battle_log_updated.connect(_on_battle_log_updated)
+	battle_manager.connect("battle_started", Callable(self, "_on_battle_manager_battle_started"))
+	battle_manager.connect("battle_ended", Callable(self, "_on_battle_ended"))
+	battle_manager.connect("battle_log_updated", Callable(self, "_on_battle_log_updated"))
 	
 	# CardSelectionWindow信号
-	card_selection_window.card_selected.connect(_on_card_selection_card_selected)
-	card_selection_window.selection_closed.connect(_on_card_selection_closed)
-	battle_manager.damage_dealt.connect(_on_damage_dealt)
+	card_selection_window.connect("card_selected", Callable(self, "_on_card_selection_card_selected"))
+	card_selection_window.connect("selection_closed", Callable(self, "_on_card_selection_closed"))
+	battle_manager.connect("damage_dealt", Callable(self, "_on_damage_dealt"))
 	
 	# BattleWindow信号
-	battle_window.battle_action_selected.connect(_on_battle_action_selected)
-	battle_window.battle_window_closed.connect(_on_battle_window_closed)
+	battle_window.connect("battle_action_selected", Callable(self, "_on_battle_action_selected"))
+	battle_window.connect("battle_window_closed", Callable(self, "_on_battle_window_closed"))
 
 func _connect_ui_signals():
 	"""连接UI信号"""
@@ -185,6 +193,7 @@ func _setup_manager_references():
 	stone_label = get_node("UI/MainUI/TopPanel/ResourcesContainer/StoneLabel")
 	metal_label = get_node("UI/MainUI/TopPanel/ResourcesContainer/MetalLabel")
 	food_label = get_node("UI/MainUI/TopPanel/ResourcesContainer/FoodLabel")
+	spirit_label = get_node("UI/MainUI/TopPanel/ResourcesContainer/SpiritLabel")
 	
 	loop_label = get_node("UI/MainUI/BottomPanel/StatusContainer/LoopLabel")
 	state_label = get_node("UI/MainUI/BottomPanel/StatusContainer/StateLabel")
@@ -212,7 +221,7 @@ func _setup_manager_references():
 	
 	# 连接BattleManager的battle_ended信号到LoopManager
 	# 这样确保LoopManager的on_battle_ended函数会被调用
-	battle_manager.battle_ended.connect(loop_manager.on_battle_ended)
+	battle_manager.connect("battle_ended", Callable(loop_manager, "on_battle_ended"))
 	print("[MainGameController] Connected BattleManager.battle_ended to LoopManager.on_battle_ended")
 
 func _on_game_state_changed(new_state: int):
@@ -284,6 +293,9 @@ func _on_day_changed(day: int):
 	# 暂停游戏移动
 	if loop_manager:
 		loop_manager.stop_hero_movement()
+		# 标记选择窗口活动，防止继续移动或触发战斗
+		if loop_manager.has_method("set_selection_active"):
+			loop_manager.set_selection_active(true)
 	
 	# 弹出卡牌选择窗口
 	if card_selection_window:
@@ -395,6 +407,8 @@ func _update_resources_display():
 			metal_label.text = "金属: " + str(game_manager.get_resource_amount("metal"))
 		if food_label:
 			food_label.text = "食物: " + str(game_manager.get_resource_amount("food"))
+		if spirit_label:
+			spirit_label.text = "灵石: " + str(game_manager.get_resource_amount("spirit_stones"))
 
 func _update_hero_display():
 	"""更新英雄信息显示"""
@@ -407,7 +421,10 @@ func _update_hero_display():
 	
 	# 更新步数显示
 	if loop_manager and step_label:
-		step_label.text = "步数: " + str(loop_manager.get_step_count())
+		if loop_manager.has_method("get_step_count"):
+			step_label.text = "步数: " + str(loop_manager.get_step_count())
+		else:
+			step_label.text = "步数: N/A"
 
 func _update_game_state_display():
 	"""更新游戏状态显示"""
@@ -431,9 +448,14 @@ func _update_game_state_display():
 func _update_time_display():
 	"""更新时间系统显示"""
 	if loop_manager:
-		var current_day = loop_manager.current_day
-		var steps_in_day = loop_manager.steps_in_current_day
-		var steps_per_day = loop_manager.STEPS_PER_DAY
+		var current_day := 1
+		var steps_in_day := 0
+		var steps_per_day := 20
+		if loop_manager.has_method("get_time_info"):
+			var time_info: Dictionary = loop_manager.get_time_info()
+			current_day = int(time_info.get("current_day", current_day))
+			steps_in_day = int(time_info.get("steps_in_current_day", steps_in_day))
+			steps_per_day = int(time_info.get("steps_per_day", steps_per_day))
 		
 		# 更新天数标签
 		if day_label:
@@ -558,10 +580,9 @@ func _try_place_terrain_card_at_mouse(mouse_pos: Vector2):
 			# 清除选择状态
 			_cancel_terrain_card_placement()
 			
-			# 恢复游戏移动
-			if loop_manager and not loop_manager.is_moving:
-				loop_manager.start_hero_movement()
-				_add_log("[color=cyan]游戏继续[/color]")
+			# 继续购买剩余卡牌（若有）
+			if card_selection_window:
+				card_selection_window.continue_selection()
 		else:
 			_add_log("[color=red]放置失败[/color]")
 	else:
@@ -604,11 +625,6 @@ func _cancel_terrain_card_placement():
 	
 	# 隐藏可放置区域高亮
 	loop_manager.hide_placeable_highlights()
-	
-	# 恢复游戏移动
-	if loop_manager and not loop_manager.is_moving:
-		loop_manager.start_hero_movement()
-		_add_log("[color=cyan]游戏继续[/color]")
 	
 	_add_log("[color=gray]取消地形卡牌放置[/color]")
 
@@ -714,6 +730,10 @@ func _on_card_selection_closed():
 	
 	# 隐藏可放置区域高亮
 	loop_manager.hide_placeable_highlights()
+	
+	# 解除选择活动暂停
+	if loop_manager and loop_manager.has_method("set_selection_active"):
+		loop_manager.set_selection_active(false)
 	
 	# 恢复游戏移动
 	if loop_manager and not loop_manager.is_moving:
@@ -837,10 +857,20 @@ func _monitor_game_progress():
 		await get_tree().create_timer(2.0).timeout  # 每2秒检查一次
 		
 		if loop_manager:
-			var current_day = loop_manager.current_day
-			var current_step = loop_manager.steps_in_current_day
-			var total_steps = loop_manager.step_count
-			var is_moving = loop_manager.is_moving
+			var current_day := 1
+			var current_step := 0
+			var total_steps := 0
+			var is_moving := false
+			if loop_manager.has_method("get_time_info"):
+				var time_info: Dictionary = loop_manager.get_time_info()
+				current_day = int(time_info.get("current_day", current_day))
+				current_step = int(time_info.get("steps_in_current_day", current_step))
+			# 其余状态尝试安全获取
+			if loop_manager.has_method("get_step_count"):
+				total_steps = int(loop_manager.get_step_count())
+			# is_moving为属性，无法检测，使用异常安全的方式
+			if loop_manager.has_method("is_moving"):
+				is_moving = bool(loop_manager.is_moving)
 			
 			# 检查游戏是否卡住
 			if total_steps == last_total_steps and current_day == last_day and current_step == last_step_in_day:
@@ -861,8 +891,13 @@ func _monitor_game_progress():
 			if current_day == 4 and current_step == 19:
 				print("[CRITICAL] Reached Day 4 Step 19!")
 				print("[CRITICAL] Current game state: ", game_manager.current_state if game_manager else "No GameManager")
-				print("[CRITICAL] Hero position: ", loop_manager.hero_position if loop_manager else "No LoopManager")
-				print("[CRITICAL] Is moving: ", loop_manager.is_moving if loop_manager else "No LoopManager")
+				# 英雄位置与移动状态使用安全输出
+				var hero_pos = loop_manager.hero_position if loop_manager else "No LoopManager"
+				var moving_state = false
+				if loop_manager and loop_manager.has_method("is_moving"):
+					moving_state = bool(loop_manager.is_moving)
+				print("[CRITICAL] Hero position: ", hero_pos)
+				print("[CRITICAL] Is moving: ", moving_state)
 				
 				# 检查卡牌选择窗口状态
 				if card_selection_window:

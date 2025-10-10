@@ -236,14 +236,21 @@ func _calculate_victory_rewards() -> Dictionary:
 	var base_exp = original_enemy_hp + enemy_data.get("attack", 0) * 2
 	rewards.experience = base_exp
 	
-	# 资源奖励（如果敌人卡牌有定义）
+ 	# 资源奖励（如果敌人卡牌有定义）
+	var spirit_reward = 5
+	if enemy_data.has("is_boss") and enemy_data.get("is_boss") == true:
+		spirit_reward = 50
+
 	if enemy_data.has("rewards"):
 		rewards.resources = enemy_data.rewards.duplicate()
+		# 追加灵石奖励
+		rewards.resources["spirit_stones"] = rewards.resources.get("spirit_stones", 0) + spirit_reward
 	else:
-		# 默认资源奖励
+		# 默认资源奖励（基础材料 + 灵石）
 		rewards.resources = {
 			"wood": randi_range(1, 3),
-			"stone": randi_range(0, 2)
+			"stone": randi_range(0, 2),
+			"spirit_stones": spirit_reward
 		}
 	
 	# 装备掉落（低概率）
@@ -262,12 +269,20 @@ func _apply_victory_rewards(rewards: Dictionary):
 	
 	# 给予资源
 	if rewards.has("resources"):
-		var game_manager = get_node_or_null("/root/GameManager")
+		var game_manager = get_node_or_null("../GameManager")
+		if not game_manager:
+			game_manager = get_node_or_null("/root/MainGame/GameManager")
+		if not game_manager:
+			# 作为兜底，尝试通过静态实例访问
+			if typeof(GameManager) != TYPE_NIL and GameManager.instance != null:
+				game_manager = GameManager.instance
 		if game_manager and game_manager.has_method("add_resources"):
 			for resource_type in rewards.resources:
 				var amount = rewards.resources[resource_type]
 				game_manager.add_resources(resource_type, amount)
 				_add_battle_log("获得 " + str(amount) + " " + resource_type)
+		else:
+			_add_battle_log("[警告] 未找到GameManager，资源奖励未应用")
 	
 	# 给予物品
 	if rewards.has("items"):

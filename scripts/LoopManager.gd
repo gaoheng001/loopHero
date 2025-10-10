@@ -37,6 +37,7 @@ var loop_path: Array[Vector2] = []
 var placed_cards: Dictionary = {}  # tile_index -> card_data
 var placed_terrain_cards: Dictionary = {}  # tile_index -> terrain_card_data
 var just_finished_battle: bool = false  # 刚刚结束战斗的标记
+var selection_active: bool = false  # 卡牌选择或交互暂停标记
 var step_count: int = 0  # 步数计数器
 
 # 网格地图状态
@@ -139,15 +140,12 @@ func _generate_custom_path_from_tilemap():
 			var atlas_coords = tile_map_layer.get_cell_atlas_coords(tile_pos)
 			
 
-			# 检查是否是路径瓦片（source ID不为-1且atlas坐标为(25,5)表示路径）
-			if tile_data != -1 and atlas_coords == Vector2i(25, 5):
-				# 将瓦片坐标转换为TileMapLayer的本地坐标
+			# 检查是否是路径瓦片：根据 TileSet 映射，路径瓦片的 source_id 为 0
+			if tile_data == 0:
+				# 将瓦片坐标转换为TileMapLayer的本地坐标并再转换为全局坐标
 				var tile_local_pos = tile_map_layer.map_to_local(tile_pos)
-				# 应用TileMapLayer的变换（position和scale）
-				var transformed_pos = tile_local_pos * tile_map_layer.scale + tile_map_layer.position
-				# 转换为相对于LoopManager的本地坐标（LoopManager position是(640, 360)）
-				var final_pos = transformed_pos + position
-				path_points.append(final_pos)
+				var global_pos = tile_map_layer.to_global(tile_local_pos)
+				path_points.append(global_pos)
 	
 	print("Found ", path_points.size(), " path tiles in TileMapLayer")
 	
@@ -202,6 +200,9 @@ func _initialize_level1_map():
 
 func start_hero_movement():
 	"""开始英雄移动"""
+	if selection_active:
+		print("[LoopManager] Selection active, not starting movement")
+		return
 	if not is_moving:
 		is_moving = true
 		# 只在英雄位置未初始化时才设置到起始位置
@@ -258,13 +259,29 @@ func _move_to_next_tile():
 		movement_tween.kill()
 	
 	# 创建移动补间动画
+	var distance = hero_position.distance_to(target_position)
+	var duration = max(distance / MOVE_SPEED, 0.05)
 	movement_tween = create_tween()
-	# 设置补间动画属性，使移动更平滑
 	movement_tween.set_ease(Tween.EASE_IN_OUT)
 	movement_tween.set_trans(Tween.TRANS_SINE)
 	
-	# 在动画过程中持续重绘，缩短动画时间减少停顿感
-	movement_tween.tween_method(_on_hero_position_update, hero_position, target_position, 0.3)
+	# 使用属性补间让英雄节点实际移动
+	if hero_node:
+		# 在开始移动前确保动画播放（带安全回退）
+		var animated_sprite = hero_node.get_node("AnimatedSprite2D")
+		if animated_sprite:
+			var frames = animated_sprite.sprite_frames
+			if frames:
+				var names = frames.get_animation_names()
+				var target_anim = "walk"
+				if not names.has("walk") and names.size() > 0:
+					target_anim = names[0]
+				if animated_sprite.animation != target_anim or not animated_sprite.is_playing():
+					animated_sprite.play(target_anim)
+
+		movement_tween.tween_property(hero_node, "position", target_position, duration)
+	else:
+		movement_tween.tween_method(_on_hero_position_update, hero_position, target_position, duration)
 	movement_tween.tween_callback(_on_movement_completed)
 
 func _on_hero_position_update(position: Vector2):
@@ -273,15 +290,25 @@ func _on_hero_position_update(position: Vector2):
 	# 更新Character_sword节点的位置
 	if hero_node:
 		hero_node.position = position
-		# 播放walk动画
+		# 播放动画（带安全回退）
 		var animated_sprite = hero_node.get_node("AnimatedSprite2D")
 		if animated_sprite:
-			if not animated_sprite.is_playing() or animated_sprite.animation != "walk":
-				animated_sprite.play("walk")
+			var frames = animated_sprite.sprite_frames
+			if frames:
+				var names = frames.get_animation_names()
+				var target_anim = "walk"
+				if not names.has("walk") and names.size() > 0:
+					target_anim = names[0]
+				if animated_sprite.animation != target_anim or not animated_sprite.is_playing():
+					animated_sprite.play(target_anim)
 	queue_redraw()
+
 
 func _on_movement_completed():
 	"""移动完成回调"""
+	# 同步内部位置到节点
+	if hero_node:
+		hero_position = hero_node.position
 	# 更新步数计数器
 	step_count += 1
 	steps_in_current_day += 1
@@ -294,6 +321,11 @@ func _on_movement_completed():
 		day_changed.emit(current_day)
 		# 新的一天开始时生成怪物
 		_spawn_monsters_for_new_day()
+
+	# 若选择窗口处于活动状态，确保暂停移动
+	if selection_active:
+		is_moving = false
+		print("[LoopManager] Selection active after movement complete, pausing movement")
 	
 	# 检查是否完成一圈
 	if current_tile_index == 0:
@@ -321,6 +353,12 @@ func _on_movement_completed():
 func _on_tile_reached(tile_position: Vector2):
 	"""到达瓦片时的处理"""
 	print("Hero reached tile ", current_tile_index, " at position ", tile_position)
+
+	# 选择窗口活动时，不进行任何战斗或卡牌检查，并保持暂停
+	if selection_active:
+		is_moving = false
+		print("[LoopManager] Selection active on tile reach, skipping checks and pausing movement")
+		return
 	
 	# 如果刚刚结束战斗，跳过所有检查（包括卡牌效果和随机战斗）
 	var skip_battle_checks = false
@@ -329,7 +367,8 @@ func _on_tile_reached(tile_position: Vector2):
 		skip_battle_checks = true
 		print("[LoopManager] Skipping battle checks - just finished battle")
 		# 确保在跳过战斗检查时保持移动状态
-		is_moving = true
+		if not selection_active:
+			is_moving = true
 		return
 	
 	var has_battle = false
@@ -479,6 +518,14 @@ func get_step_count() -> int:
 	"""获取当前步数"""
 	return step_count
 
+func get_time_info() -> Dictionary:
+	"""获取时间系统信息: 当前天、当天步数、每日步数上限"""
+	return {
+		"current_day": current_day,
+		"steps_in_current_day": steps_in_current_day,
+		"steps_per_day": STEPS_PER_DAY
+	}
+
 func get_path_length() -> int:
 	"""获取路径长度"""
 	return loop_path.size()
@@ -506,8 +553,9 @@ func on_battle_window_closed():
 	"""战斗窗口关闭后的处理"""
 	print("Battle window closed, resuming movement...")
 	if just_finished_battle:
-		is_moving = true
-		_move_to_next_tile()
+		if not selection_active:
+			is_moving = true
+			_move_to_next_tile()
 
 # 路径类型相关函数已移除，现在只支持自定义瓦片路径
 
@@ -1262,4 +1310,11 @@ func hide_placeable_highlights():
 	print("[LoopManager] 隐藏了可放置区域高亮")
 
 		# 英雄现在使用Character_sword节点显示，不需要在这里绘制瓦片位置和英雄
+
+func set_selection_active(active: bool):
+	"""设置选择窗口活动状态，活动时强制暂停移动"""
+	selection_active = active
+	if selection_active:
+		is_moving = false
+		print("[LoopManager] Selection active set, pausing movement")
 

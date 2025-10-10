@@ -2228,6 +2228,10 @@ text = "金属: 0"
 layout_mode = 2
 text = "食物: 0"
 
+[node name="SpiritLabel" type="Label" parent="UI/MainUI/TopPanel/ResourcesContainer"]
+layout_mode = 2
+text = "灵石: 0"
+
 [node name="HeroPanel" type="Panel" parent="UI/MainUI/TopPanel"]
 layout_mode = 1
 anchors_preset = 6

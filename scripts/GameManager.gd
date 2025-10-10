@@ -25,11 +25,12 @@ var is_paused: bool = false
 
 # 资源数据
 var resources: Dictionary = {
-	"wood": 0,
-	"stone": 0,
-	"metal": 0,
-	"magic_crystal": 0,
-	"food": 0
+    "wood": 0,
+    "stone": 0,
+    "metal": 0,
+    "magic_crystal": 0,
+    "food": 0,
+    "spirit_stones": 0
 }
 
 # 单例实例
@@ -150,6 +151,8 @@ func reset_resources():
 	# 给予初始资源
 	resources["wood"] = 10
 	resources["food"] = 5
+	# 给予灵石用于测试与卡牌购买/刷新
+	resources["spirit_stones"] = 50
 	resources_changed.emit(resources)
 
 func _input(event):

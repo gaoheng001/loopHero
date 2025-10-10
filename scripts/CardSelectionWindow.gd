@@ -11,6 +11,8 @@ signal selection_closed
 @onready var title_label: Label = $SelectionPanel/MainContainer/TitleLabel
 @onready var cards_container: HBoxContainer = $SelectionPanel/MainContainer/CardsContainer
 @onready var close_button: Button = $SelectionPanel/MainContainer/ButtonContainer/CloseButton
+@onready var refresh_button: Button = $SelectionPanel/MainContainer/ButtonContainer/RefreshButton
+@onready var refresh_price_label: Label = $SelectionPanel/MainContainer/ButtonContainer/RefreshPriceLabel
 
 # 卡牌按钮和标签引用
 @onready var card1_button: Button = $SelectionPanel/MainContainer/CardsContainer/Card1/Card1Button
@@ -27,6 +29,10 @@ signal selection_closed
 
 # 当前可选择的卡牌数据
 var available_cards: Array[Dictionary] = []
+var refresh_count: int = 0
+var base_refresh_price: int = 5
+var refresh_increment: int = 5
+var current_day: int = 0
 
 func _ready():
 	# 连接按钮信号
@@ -34,7 +40,9 @@ func _ready():
 	card2_button.pressed.connect(_on_card2_selected)
 	card3_button.pressed.connect(_on_card3_selected)
 	close_button.pressed.connect(_on_close_button_pressed)
-	
+	if refresh_button:
+		refresh_button.pressed.connect(_on_refresh_pressed)
+
 	# 初始状态隐藏窗口
 	visible = false
 	
@@ -43,14 +51,15 @@ func _ready():
 
 func show_card_selection(day: int):
 	"""显示卡牌选择窗口"""
+	current_day = day
 	
 	# 检查UI组件是否可用（headless模式下可能为空）
 	if title_label:
 		title_label.text = "第" + str(day) + "天 - 选择一张卡牌"
 	
-	# 生成3张随机卡牌
+	# 生成3张随机卡牌（仅允许地形类型）
 	available_cards = _generate_random_cards()
-	
+
 	if available_cards.size() == 0:
 		print("[CardSelection] ERROR: No cards generated! This will cause problems.")
 		return
@@ -60,6 +69,9 @@ func show_card_selection(day: int):
 	
 	# 显示窗口
 	visible = true
+
+	# 更新刷新价格与按钮状态
+	_update_prices_and_buttons()
 	
 	# 在headless模式下自动选择第一张卡牌
 	if DisplayServer.get_name() == "headless":
@@ -77,58 +89,11 @@ func hide_selection():
 func _generate_random_cards() -> Array[Dictionary]:
 	"""生成3张随机地形卡牌"""
 	var cards: Array[Dictionary] = []
-	
-	# 从CardManager获取卡牌数据 - 修复节点路径
-	var card_manager = get_node_or_null("../../CardManager")
+	var card_manager = _get_card_manager()
 	if not card_manager:
-		card_manager = get_node_or_null("/root/MainGame/CardManager")
-		if not card_manager:
-			print("[CardSelection] ERROR: 无法找到CardManager节点")
-			return cards
-	
-	# 验证CardManager的状态
-	if not "card_database" in card_manager:
-		print("[CardSelection] ERROR: CardManager没有card_database属性!")
 		return cards
-	
-	# 动态获取所有地形卡牌ID
-	var terrain_card_ids = []
-	var terrain_type_value = str(CardManager.CardType.TERRAIN)
-	
-	for card_id in card_manager.card_database.keys():
-		var card_data = card_manager.card_database[card_id]
-		if card_data.has("type"):
-			var type_str = str(card_data["type"])
-			if type_str == terrain_type_value:
-				terrain_card_ids.append(card_id)
-	
-	if terrain_card_ids.size() == 0:
-		print("[CardSelection] ERROR: 没有找到地形卡牌")
-		return cards
-	
-	# 随机打乱卡牌顺序
-	terrain_card_ids.shuffle()
-	
-	# 选择前3张卡牌（确保总是有3张卡牌）
-	for i in range(3):
-		var card_id = terrain_card_ids[i % terrain_card_ids.size()]
-		var card_data = card_manager.get_card_by_id(card_id)
-		
-		if card_data.is_empty():
-			print("[CardSelection] WARNING: 无法获取卡牌数据: ", card_id)
-			# 创建默认卡牌数据作为回退
-			var default_card = {
-				"id": card_id,
-				"name": "未知卡牌",
-				"description": "卡牌数据加载失败",
-				"type": CardManager.CardType.TERRAIN,
-				"rarity": CardManager.CardRarity.COMMON,
-				"effects": {}
-			}
-			cards.append(default_card)
-		else:
-			cards.append(card_data)
-	
+	# 使用CardManager的生成接口，允许类型为地形
+	cards = card_manager.generate_random_cards(3, [CardManager.CardType.TERRAIN])
 	return cards
 
 func _update_card_display():
@@ -139,32 +104,46 @@ func _update_card_display():
 		print("[CardSelection] WARNING: available_cards为空，强制重新生成")
 		available_cards = _generate_random_cards()
 	
+	var game_manager = _get_game_manager()
+	var stones = 0
+	if game_manager:
+		stones = game_manager.get_resource_amount("spirit_stones")
+
 	if available_cards.size() >= 1:
 		card1_name.text = available_cards[0].name
-		card1_description.text = available_cards[0].description
-		card1_button.disabled = false
+		var price1 = _get_card_price(available_cards[0])
+		card1_description.text = available_cards[0].description + "\n价格: " + str(price1) + " 灵石"
+		card1_button.text = "购买"
+		card1_button.disabled = stones < price1
 	else:
 		card1_name.text = "无卡牌"
 		card1_description.text = ""
 		card1_button.disabled = true
-	
+
 	if available_cards.size() >= 2:
 		card2_name.text = available_cards[1].name
-		card2_description.text = available_cards[1].description
-		card2_button.disabled = false
+		var price2 = _get_card_price(available_cards[1])
+		card2_description.text = available_cards[1].description + "\n价格: " + str(price2) + " 灵石"
+		card2_button.text = "购买"
+		card2_button.disabled = stones < price2
 	else:
 		card2_name.text = "无卡牌"
 		card2_description.text = ""
 		card2_button.disabled = true
-	
+
 	if available_cards.size() >= 3:
 		card3_name.text = available_cards[2].name
-		card3_description.text = available_cards[2].description
-		card3_button.disabled = false
+		var price3 = _get_card_price(available_cards[2])
+		card3_description.text = available_cards[2].description + "\n价格: " + str(price3) + " 灵石"
+		card3_button.text = "购买"
+		card3_button.disabled = stones < price3
 	else:
 		card3_name.text = "无卡牌"
 		card3_description.text = ""
 		card3_button.disabled = true
+
+	_update_title()
+	_update_refresh_label()
 
 func _on_card1_selected():
 	"""选择第1张卡牌"""
@@ -201,10 +180,106 @@ func _test_card_manager():
 
 func _select_card(card_data: Dictionary):
 	"""选择卡牌"""
-	card_selected.emit(card_data)
-	hide_selection()
+	# 购买扣费
+	var gm = _get_game_manager()
+	var price = _get_card_price(card_data)
+	if gm:
+		if gm.spend_resources("spirit_stones", price):
+			# 从待选列表移除已购买卡牌
+			_remove_selected_card(card_data)
+			# 发出选择信号并隐藏窗口以进行放置
+			card_selected.emit(card_data)
+			hide_selection()
+			return
+		else:
+			print("[CardSelection] 灵石不足，无法购买: ", card_data.name)
+			if DisplayServer.get_name() == "headless":
+				print("[CardSelection] Headless模式下忽略购买消耗，直接选择用于自动化测试")
+				_remove_selected_card(card_data)
+				card_selected.emit(card_data)
+				hide_selection()
+				return
+	else:
+		print("[CardSelection] 未找到GameManager，直接选择（测试模式）")
+		_remove_selected_card(card_data)
+		card_selected.emit(card_data)
+		hide_selection()
+
+func _remove_selected_card(selected: Dictionary):
+	"""从当前备选列表中移除已选择的卡牌（基于id匹配）"""
+	var sid = selected.get("id", null)
+	if sid != null:
+		for i in range(available_cards.size()):
+			if available_cards[i].get("id", null) == sid:
+				available_cards.remove_at(i)
+				break
+	else:
+		available_cards.erase(selected)
+
+func continue_selection():
+	"""继续购买剩余卡牌：若仍有卡牌则重新显示窗口，否则视为关闭"""
+	if available_cards.size() > 0:
+		_update_card_display()
+		visible = true
+		_update_prices_and_buttons()
+	else:
+		selection_closed.emit()
+		hide_selection()
 
 func _on_close_button_pressed():
 	"""关闭按钮点击"""
 	selection_closed.emit()
 	hide_selection()
+
+func _on_refresh_pressed():
+	"""刷新按钮点击，消耗灵石后重新生成卡牌"""
+	var gm = _get_game_manager()
+	if not gm:
+		print("[CardSelection] 未找到GameManager，无法刷新")
+		return
+	var price = base_refresh_price + refresh_count * refresh_increment
+	if gm.spend_resources("spirit_stones", price):
+		refresh_count += 1
+		available_cards = _generate_random_cards()
+		_update_card_display()
+		_update_prices_and_buttons()
+	else:
+		print("[CardSelection] 灵石不足，无法刷新。需要: ", price)
+
+func _update_prices_and_buttons():
+	"""更新刷新按钮与卡牌按钮的可用状态"""
+	_update_card_display()
+
+func _update_title():
+	var gm = _get_game_manager()
+	if title_label and gm:
+		title_label.text = "第" + str(current_day) + "天 - 选择一张卡牌    (灵石: " + str(gm.get_resource_amount("spirit_stones")) + ")"
+
+func _update_refresh_label():
+	if refresh_price_label:
+		var price = base_refresh_price + refresh_count * refresh_increment
+		refresh_price_label.text = "刷新价格: " + str(price) + " 灵石"
+	if refresh_button:
+		var gm = _get_game_manager()
+		var stones = gm.get_resource_amount("spirit_stones") if gm else 0
+		refresh_button.disabled = stones < (base_refresh_price + refresh_count * refresh_increment)
+
+func _get_game_manager() -> Node:
+	var gm = get_node_or_null("../../GameManager")
+	if not gm:
+		gm = get_node_or_null("/root/MainGame/GameManager")
+	if not gm:
+		gm = get_node_or_null("/root/GameManager")
+	return gm
+
+func _get_card_manager() -> Node:
+	var cm = get_node_or_null("../../CardManager")
+	if not cm:
+		cm = get_node_or_null("/root/MainGame/CardManager")
+	return cm
+
+func _get_card_price(card_data: Dictionary) -> int:
+	var cm = _get_card_manager()
+	if cm and cm.has_method("get_card_price"):
+		return cm.get_card_price(card_data)
+	return 10

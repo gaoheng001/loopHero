@@ -36,6 +36,14 @@ var cards_per_draw: int = 1
 # 放置限制
 var placement_rules: Dictionary = {}
 
+# 类型定价表（仅作为对外查询，不用于战斗掉落）
+var type_price_table: Dictionary = {
+    CardType.ENEMY: 0,
+    CardType.TERRAIN: 10,
+    CardType.BUILDING: 15,
+    CardType.SPECIAL: 20
+}
+
 func _ready():
 	# 初始化卡牌数据库
 	_initialize_card_database()
@@ -397,4 +405,39 @@ func get_cards_by_rarity(rarity: CardRarity) -> Array[Dictionary]:
 		if card.rarity == rarity:
 			result.append(card)
 	
+	return result
+
+func get_card_price(card_data: Dictionary) -> int:
+	"""按类型返回卡牌价格（默认地形10、建筑15、特殊20、敌人0）"""
+	var t = card_data.get("type", null)
+	# 兼容字符串与枚举
+	if typeof(t) == TYPE_STRING:
+		match t:
+			"enemy":
+				return type_price_table[CardType.ENEMY]
+			"terrain":
+				return type_price_table[CardType.TERRAIN]
+			"building":
+				return type_price_table[CardType.BUILDING]
+			"special":
+				return type_price_table[CardType.SPECIAL]
+			_:
+				return 10
+	elif typeof(t) == TYPE_INT:
+		return type_price_table.get(t, 10)
+	else:
+		return 10
+
+func generate_random_cards(count: int = 3, allowed_types: Array = [CardType.TERRAIN]) -> Array[Dictionary]:
+	"""生成指定数量的随机卡牌（按允许类型过滤）"""
+	var pool: Array[Dictionary] = []
+	for card in card_database.values():
+		if allowed_types.has(card.type):
+			pool.append(card)
+	if pool.size() == 0:
+		return []
+	pool.shuffle()
+	var result: Array[Dictionary] = []
+	for i in range(count):
+		result.append(pool[i % pool.size()].duplicate())
 	return result
