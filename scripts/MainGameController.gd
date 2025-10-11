@@ -71,15 +71,6 @@ func _ready():
 	# 添加测试：延迟5秒后自动测试开始按钮
 	print("[MainGameController] Ready for user interaction")
 
-	# 启动持续监控，观察第4天第19步的行为
-
-	# 无交互环境下自动启动游戏，避免卡在 Day:1 Step:0
-	if game_manager and loop_manager:
-		if not loop_manager.is_moving:
-			print("[MainGameController] Auto-starting loop...")
-			_on_start_button_pressed()
-	_start_continuous_monitoring()
-
 func _connect_manager_signals():
 	"""连接管理器信号"""
 	# GameManager信号
@@ -126,18 +117,18 @@ func _connect_ui_signals():
 	pause_button.pressed.connect(_on_pause_button_pressed)
 
 func _initialize_ui():
-    """初始化UI"""
-    # 更新资源显示
-    _update_resources_display()
-    
-    # 更新英雄信息
-    _update_hero_display()
-    
-    # 更新时间系统显示
-    _update_time_display()
-    
-    # 更新游戏状态
-    _update_game_state_display()
+	"""初始化UI"""
+	# 更新资源显示
+	_update_resources_display()
+
+	# 更新英雄信息
+	_update_hero_display()
+
+	# 更新时间系统显示
+	_update_time_display()
+
+	# 更新游戏状态
+	_update_game_state_display()
 
 	# 初始化战斗日志
 	if log_text:
@@ -207,7 +198,7 @@ func _setup_manager_references():
 	step_label = get_node("UI/MainUI/TopPanel/HeroPanel/HeroContainer/StepLabel")
 	
 	log_text = get_node("UI/MainUI/LogPanel/LogContainer/LogScrollContainer/LogText")
-	hand_container = get_node("UI/MainUI/BottomPanel/HandPanel/HandContainer")
+	hand_container = get_node_or_null("UI/MainUI/BottomPanel/HandPanel/HandContainer")
 	
 	battle_window = get_node("UI/BattleWindow")
 	card_selection_window = get_node("UI/CardSelectionWindow")
@@ -236,6 +227,11 @@ func _on_game_state_changed(new_state: int):
 				start_button.disabled = true
 			if retreat_button:
 				retreat_button.disabled = false
+			# 恢复移动：从暂停返回到循环时确保英雄继续前进
+			if loop_manager and not get_tree().paused:
+				if loop_manager.has_method("start_hero_movement") and not loop_manager.is_moving and (not loop_manager.selection_active):
+					loop_manager.start_hero_movement()
+					_add_log("[color=cyan]游戏继续[/color]")
 		2: # SECT_MANAGEMENT
 			if start_button:
 				start_button.text = "开始循环"
@@ -342,8 +338,8 @@ func _on_battle_log_updated(message: String):
 	_add_log(message)
 
 func _on_hand_updated(new_hand: Array):
-    """手牌更新"""
-    pass
+	"""手牌更新"""
+	pass
 
 func _on_card_placed(card_data: Dictionary, position: Vector2):
 	"""卡牌放置"""
@@ -369,6 +365,9 @@ func _on_start_button_pressed():
 	print("[MainGameController] _on_start_button_pressed called!")
 	print("[MainGameController] game_manager exists: ", game_manager != null)
 	print("[MainGameController] loop_manager exists: ", loop_manager != null)
+	
+	# 防御性处理：确保不在暂停状态，避免按钮点击或移动被阻断
+	get_tree().paused = false
 	
 	if game_manager and game_manager.has_method("start_new_loop"):
 		print("[MainGameController] Calling game_manager.start_new_loop()")
@@ -841,79 +840,6 @@ func _process(delta):
 			# 在有效位置时显示绿色
 			terrain_card_preview_sprite.modulate = Color.WHITE
 
-func _start_continuous_monitoring():
-	"""启动持续监控，观察第4天第19步的行为"""
-	print("[MainGameController] Starting continuous monitoring for Day 4 Step 19...")
-	_monitor_game_progress()
-
-func _monitor_game_progress():
-	"""监控游戏进度"""
-	var last_total_steps = -1
-	var last_day = -1
-	var last_step_in_day = -1
-	var stuck_count = 0
-	
-	while true:
-		await get_tree().create_timer(2.0).timeout  # 每2秒检查一次
-		
-		if loop_manager:
-			var current_day := 1
-			var current_step := 0
-			var total_steps := 0
-			var is_moving := false
-			if loop_manager.has_method("get_time_info"):
-				var time_info: Dictionary = loop_manager.get_time_info()
-				current_day = int(time_info.get("current_day", current_day))
-				current_step = int(time_info.get("steps_in_current_day", current_step))
-			# 其余状态尝试安全获取
-			if loop_manager.has_method("get_step_count"):
-				total_steps = int(loop_manager.get_step_count())
-			# is_moving为属性，无法检测，使用异常安全的方式
-			if loop_manager.has_method("is_moving"):
-				is_moving = bool(loop_manager.is_moving)
-			
-			# 检查游戏是否卡住
-			if total_steps == last_total_steps and current_day == last_day and current_step == last_step_in_day:
-				stuck_count += 1
-				if stuck_count >= 5:  # 如果10秒没有变化
-					print("[Monitor] GAME STUCK! Day: ", current_day, ", Step: ", current_step, ", Total: ", total_steps, ", Moving: ", is_moving)
-					stuck_count = 0
-			else:
-				stuck_count = 0
-				print("[Monitor] Day: ", current_day, ", Step in day: ", current_step, ", Total steps: ", total_steps, ", Moving: ", is_moving)
-			
-			# 更新上次状态
-			last_total_steps = total_steps
-			last_day = current_day
-			last_step_in_day = current_step
-			
-			# 重点监控第4天第19步
-			if current_day == 4 and current_step == 19:
-				print("[CRITICAL] Reached Day 4 Step 19!")
-				print("[CRITICAL] Current game state: ", game_manager.current_state if game_manager else "No GameManager")
-				# 英雄位置与移动状态使用安全输出
-				var hero_pos = loop_manager.hero_position if loop_manager else "No LoopManager"
-				var moving_state = false
-				if loop_manager and loop_manager.has_method("is_moving"):
-					moving_state = bool(loop_manager.is_moving)
-				print("[CRITICAL] Hero position: ", hero_pos)
-				print("[CRITICAL] Is moving: ", moving_state)
-				
-				# 检查卡牌选择窗口状态
-				if card_selection_window:
-					print("[CRITICAL] Card selection window visible: ", card_selection_window.visible)
-				
-				# 等待5秒观察行为
-				await get_tree().create_timer(5.0).timeout
-				print("[CRITICAL] 5 seconds after Day 4 Step 19...")
-			
-			# 如果游戏运行超过5天，停止监控
-			if current_day > 5:
-				print("[Monitor] Game has run beyond Day 5, stopping monitoring.")
-				break
-		else:
-			# 在无效位置时显示红色
-			terrain_card_preview_sprite.modulate = Color.RED
 
 func _auto_place_terrain_card():
 	"""在headless模式下自动放置地形卡牌"""

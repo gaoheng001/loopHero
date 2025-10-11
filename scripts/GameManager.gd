@@ -164,15 +164,18 @@ func _input(event):
 func toggle_pause():
 	"""切换暂停状态"""
 	print("[GameManager] toggle_pause called, current_state: ", current_state, ", is_paused: ", is_paused)
-	if current_state == GameState.IN_LOOP:
-		if is_paused:
-			print("[GameManager] Unpausing game")
-			change_state(GameState.IN_LOOP)
-			is_paused = false
-		else:
-			print("[GameManager] Pausing game")
-			change_state(GameState.PAUSED)
-			is_paused = true
+	# 修复：允许在已暂停状态下继续，而不仅限于 IN_LOOP 状态
+	if is_paused:
+		print("[GameManager] Unpausing game")
+		is_paused = false
+		change_state(GameState.IN_LOOP)
+	elif current_state == GameState.IN_LOOP:
+		print("[GameManager] Pausing game")
+		is_paused = true
+		change_state(GameState.PAUSED)
+	else:
+		# 非循环状态下忽略暂停切换
+		print("[GameManager] toggle_pause ignored in state:", current_state)
 
 func save_game():
 	"""保存游戏"""
