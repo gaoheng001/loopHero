@@ -43,6 +43,9 @@ func _ready():
 	if refresh_button:
 		refresh_button.pressed.connect(_on_refresh_pressed)
 
+	# 连接 GameManager 的资源变化信号
+	call_deferred("_connect_resource_signals")
+
 	# 初始状态隐藏窗口
 	visible = false
 	
@@ -52,6 +55,8 @@ func _ready():
 func show_card_selection(day: int):
 	"""显示卡牌选择窗口"""
 	current_day = day
+	# 每日打开时重置刷新计数
+	refresh_count = 0
 	
 	# 检查UI组件是否可用（headless模式下可能为空）
 	if title_label:
@@ -72,10 +77,12 @@ func show_card_selection(day: int):
 
 	# 更新刷新价格与按钮状态
 	_update_prices_and_buttons()
-	
-	# 在headless模式下自动选择第一张卡牌
+
+	# 在headless模式下自动选择第一张卡牌（保护get_tree为空的情况）
 	if DisplayServer.get_name() == "headless":
-		await get_tree().create_timer(1.0).timeout
+		var tree = get_tree()
+		if tree:
+			await tree.create_timer(1.0).timeout
 		if available_cards.size() > 0:
 			_select_card(available_cards[0])
 		else:
@@ -98,49 +105,76 @@ func _generate_random_cards() -> Array[Dictionary]:
 
 func _update_card_display():
 	"""更新卡牌显示"""
-	
+
 	# 如果没有卡牌，强制生成
 	if available_cards.size() == 0:
 		print("[CardSelection] WARNING: available_cards为空，强制重新生成")
 		available_cards = _generate_random_cards()
-	
+
 	var game_manager = _get_game_manager()
 	var stones = 0
 	if game_manager:
 		stones = game_manager.get_resource_amount("spirit_stones")
 
 	if available_cards.size() >= 1:
-		card1_name.text = available_cards[0].name
+		if card1_name:
+			card1_name.text = available_cards[0].name
 		var price1 = _get_card_price(available_cards[0])
-		card1_description.text = available_cards[0].description + "\n价格: " + str(price1) + " 灵石"
-		card1_button.text = "购买"
-		card1_button.disabled = stones < price1
+		if card1_description:
+			card1_description.text = available_cards[0].description + "\n价格: " + str(price1) + " 灵石"
+		if card1_button:
+			card1_button.text = "购买(" + str(price1) + ")"
+			card1_button.disabled = stones < price1
+			card1_button.tooltip_text = "" if stones >= price1 else "灵石不足"
 	else:
-		card1_name.text = "无卡牌"
-		card1_description.text = ""
-		card1_button.disabled = true
+		if card1_name:
+			card1_name.text = "无卡牌"
+		if card1_description:
+			card1_description.text = ""
+		if card1_button:
+			card1_button.disabled = true
+			card1_button.text = "不可购买"
+			card1_button.tooltip_text = ""
 
 	if available_cards.size() >= 2:
-		card2_name.text = available_cards[1].name
+		if card2_name:
+			card2_name.text = available_cards[1].name
 		var price2 = _get_card_price(available_cards[1])
-		card2_description.text = available_cards[1].description + "\n价格: " + str(price2) + " 灵石"
-		card2_button.text = "购买"
-		card2_button.disabled = stones < price2
+		if card2_description:
+			card2_description.text = available_cards[1].description + "\n价格: " + str(price2) + " 灵石"
+		if card2_button:
+			card2_button.text = "购买(" + str(price2) + ")"
+			card2_button.disabled = stones < price2
+			card2_button.tooltip_text = "" if stones >= price2 else "灵石不足"
 	else:
-		card2_name.text = "无卡牌"
-		card2_description.text = ""
-		card2_button.disabled = true
+		if card2_name:
+			card2_name.text = "无卡牌"
+		if card2_description:
+			card2_description.text = ""
+		if card2_button:
+			card2_button.disabled = true
+			card2_button.text = "不可购买"
+			card2_button.tooltip_text = ""
 
 	if available_cards.size() >= 3:
-		card3_name.text = available_cards[2].name
+		if card3_name:
+			card3_name.text = available_cards[2].name
 		var price3 = _get_card_price(available_cards[2])
-		card3_description.text = available_cards[2].description + "\n价格: " + str(price3) + " 灵石"
-		card3_button.text = "购买"
-		card3_button.disabled = stones < price3
+		if card3_description:
+			card3_description.text = available_cards[2].description + "\n价格: " + str(price3) + " 灵石"
+		if card3_button:
+			card3_button.text = "购买(" + str(price3) + ")"
+			card3_button.disabled = stones < price3
+			card3_button.tooltip_text = "" if stones >= price3 else "灵石不足"
 	else:
-		card3_name.text = "无卡牌"
-		card3_description.text = ""
-		card3_button.disabled = true
+		if card3_name:
+			card3_name.text = "无卡牌"
+		if card3_description:
+			card3_description.text = ""
+		if card3_button:
+			card3_button.disabled = true
+			card3_button.text = "不可购买"
+			card3_button.tooltip_text = ""
 
 	_update_title()
 	_update_refresh_label()
@@ -187,6 +221,8 @@ func _select_card(card_data: Dictionary):
 		if gm.spend_resources("spirit_stones", price):
 			# 从待选列表移除已购买卡牌
 			_remove_selected_card(card_data)
+			# 购买后重置刷新计数（价格清零）
+			refresh_count = 0
 			# 发出选择信号并隐藏窗口以进行放置
 			card_selected.emit(card_data)
 			hide_selection()
@@ -249,6 +285,7 @@ func _on_refresh_pressed():
 func _update_prices_and_buttons():
 	"""更新刷新按钮与卡牌按钮的可用状态"""
 	_update_card_display()
+	_update_refresh_label()
 
 func _update_title():
 	var gm = _get_game_manager()
@@ -256,13 +293,19 @@ func _update_title():
 		title_label.text = "第" + str(current_day) + "天 - 选择一张卡牌    (灵石: " + str(gm.get_resource_amount("spirit_stones")) + ")"
 
 func _update_refresh_label():
+	var price = base_refresh_price + refresh_count * refresh_increment
+	
+	# 更新刷新价格标签
 	if refresh_price_label:
-		var price = base_refresh_price + refresh_count * refresh_increment
 		refresh_price_label.text = "刷新价格: " + str(price) + " 灵石"
+	
+	# 更新刷新按钮文案和状态
 	if refresh_button:
 		var gm = _get_game_manager()
 		var stones = gm.get_resource_amount("spirit_stones") if gm else 0
-		refresh_button.disabled = stones < (base_refresh_price + refresh_count * refresh_increment)
+		refresh_button.text = "刷新(" + str(price) + ")"
+		refresh_button.disabled = stones < price
+		refresh_button.tooltip_text = "" if stones >= price else "灵石不足"
 
 func _get_game_manager() -> Node:
 	var gm = get_node_or_null("../../GameManager")
@@ -277,6 +320,21 @@ func _get_card_manager() -> Node:
 	if not cm:
 		cm = get_node_or_null("/root/MainGame/CardManager")
 	return cm
+
+func _connect_resource_signals():
+	"""连接 GameManager 的资源变化信号"""
+	var gm = _get_game_manager()
+	if gm and gm.has_signal("resources_changed"):
+		if not gm.is_connected("resources_changed", _on_resources_changed):
+			gm.connect("resources_changed", _on_resources_changed)
+			print("[CardSelection] Connected to GameManager resources_changed signal")
+	else:
+		print("[CardSelection] WARNING: GameManager not found or missing resources_changed signal")
+
+func _on_resources_changed(resources: Dictionary):
+	"""响应资源变化，更新UI状态"""
+	if visible:  # 只在窗口可见时更新UI
+		_update_prices_and_buttons()
 
 func _get_card_price(card_data: Dictionary) -> int:
 	var cm = _get_card_manager()

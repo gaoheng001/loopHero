@@ -40,6 +40,9 @@ var just_finished_battle: bool = false  # 刚刚结束战斗的标记
 var selection_active: bool = false  # 卡牌选择或交互暂停标记
 var step_count: int = 0  # 步数计数器
 
+# 调试：是否绘制路径线（已有路径瓦片可视，不再需要）
+var show_path_debug_lines: bool = false
+
 # 网格地图状态
 var grid_terrain_cards: Dictionary = {}  # Vector2i(grid_x, grid_y) -> terrain_card_data
 var grid_terrain_sprites: Dictionary = {}  # Vector2i(grid_x, grid_y) -> ColorRect节点
@@ -122,30 +125,26 @@ func _generate_loop_path():
 
 
 
+
 func _generate_custom_path_from_tilemap():
 	"""从TileMapLayer读取自定义路径点"""
 	if not tile_map_layer:
 		print("Error: TileMapLayer not found! Cannot generate path.")
 		return
-	
-	# 扫描TileMapLayer寻找路径瓦片
-	var path_points: Array[Vector2] = []
-	var search_radius = 50  # 扩大搜索半径
-	
-	# 在指定范围内搜索路径瓦片
-	for x in range(-search_radius, search_radius + 1):
-		for y in range(-search_radius, search_radius + 1):
-			var tile_pos = Vector2i(x, y)
-			var tile_data = tile_map_layer.get_cell_source_id(tile_pos)
-			var atlas_coords = tile_map_layer.get_cell_atlas_coords(tile_pos)
-			
 
-			# 检查是否是路径瓦片：根据 TileSet 映射，路径瓦片的 source_id 为 0
-			if tile_data == 0:
-				# 将瓦片坐标转换为TileMapLayer的本地坐标并再转换为全局坐标
-				var tile_local_pos = tile_map_layer.map_to_local(tile_pos)
-				var global_pos = tile_map_layer.to_global(tile_local_pos)
-				path_points.append(global_pos)
+	# 通过 get_used_cells 精确遍历所有已使用瓦片，避免错过真实路径范围
+	var path_points: Array[Vector2] = []
+	var used_cells: PackedVector2Array = tile_map_layer.get_used_cells()
+
+	for i in range(used_cells.size()):
+		var tile_pos: Vector2i = used_cells[i]
+		var atlas_coords = tile_map_layer.get_cell_atlas_coords(tile_pos)
+		# 使用 atlas 坐标识别路径瓦片（约定为 25,5）
+		if atlas_coords == Vector2i(25, 5):
+			# 将瓦片坐标转换为TileMapLayer的本地坐标并再转换为全局坐标
+			var tile_local_pos = tile_map_layer.map_to_local(tile_pos)
+			var global_pos = tile_map_layer.to_global(tile_local_pos)
+			path_points.append(global_pos)
 	
 	print("Found ", path_points.size(), " path tiles in TileMapLayer")
 	
@@ -730,16 +729,19 @@ func get_monster_at_tile(tile_index: int) -> Dictionary:
 
 func _draw():
 	"""绘制循环路径（调试用）"""
+	if not show_path_debug_lines:
+		# 默认不再绘制路径线，避免与路径瓦片显示不一致
+		return
 	if loop_path.size() > 0 and tile_map_layer:
 		# 直接使用TileMapLayer的坐标系统绘制路径
 		# 这样确保绘制的路径与TileMapLayer中的瓦片完全对齐
-		
+
 		# 绘制路径（最底层）
 		for i in range(loop_path.size()):
 			# 直接使用loop_path中已经变换过的坐标
 			var current_pos = loop_path[i]
 			var next_pos = loop_path[(i + 1) % loop_path.size()]
-			
+
 			draw_line(current_pos, next_pos, Color.WHITE, 3.0)
 
 # 地形卡牌管理函数

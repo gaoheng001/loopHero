@@ -112,9 +112,13 @@ func _connect_manager_signals():
 
 func _connect_ui_signals():
 	"""连接UI信号"""
-	start_button.pressed.connect(_on_start_button_pressed)
-	retreat_button.pressed.connect(_on_retreat_button_pressed)
-	pause_button.pressed.connect(_on_pause_button_pressed)
+	# 场景文件中已有信号连接，这里防重连以避免 "Signal is already connected" 错误
+	if start_button and not start_button.is_connected("pressed", Callable(self, "_on_start_button_pressed")):
+		start_button.connect("pressed", Callable(self, "_on_start_button_pressed"))
+	if retreat_button and not retreat_button.is_connected("pressed", Callable(self, "_on_retreat_button_pressed")):
+		retreat_button.connect("pressed", Callable(self, "_on_retreat_button_pressed"))
+	if pause_button and not pause_button.is_connected("pressed", Callable(self, "_on_pause_button_pressed")):
+		pause_button.connect("pressed", Callable(self, "_on_pause_button_pressed"))
 
 func _initialize_ui():
 	"""初始化UI"""
