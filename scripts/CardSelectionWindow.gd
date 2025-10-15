@@ -226,6 +226,9 @@ func _select_card(card_data: Dictionary):
 			# 发出选择信号并隐藏窗口以进行放置
 			card_selected.emit(card_data)
 			hide_selection()
+			# Headless 环境下，直接视为选择窗口关闭以恢复移动
+			if DisplayServer.get_name() == "headless":
+				selection_closed.emit()
 			return
 		else:
 			print("[CardSelection] 灵石不足，无法购买: ", card_data.name)
@@ -234,12 +237,15 @@ func _select_card(card_data: Dictionary):
 				_remove_selected_card(card_data)
 				card_selected.emit(card_data)
 				hide_selection()
+				selection_closed.emit()
 				return
 	else:
 		print("[CardSelection] 未找到GameManager，直接选择（测试模式）")
 		_remove_selected_card(card_data)
 		card_selected.emit(card_data)
 		hide_selection()
+		if DisplayServer.get_name() == "headless":
+			selection_closed.emit()
 
 func _remove_selected_card(selected: Dictionary):
 	"""从当前备选列表中移除已选择的卡牌（基于id匹配）"""

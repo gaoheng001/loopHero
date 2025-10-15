@@ -426,7 +426,18 @@ func _trigger_monster_battle(monster_data: Dictionary):
 func _trigger_battle(enemy_card: Dictionary):
 	"""触发战斗"""
 	print("Battle triggered with ", enemy_card.name)
-	battle_started.emit(enemy_card)
+	# 将卡牌数据转换为战斗数据，兼容 BattleManager 期望的字段
+	var ed: Dictionary = enemy_card.get("enemy_data", {})
+	var battle_data: Dictionary = {
+		"name": ed.get("name", enemy_card.get("name", "Enemy")),
+		"type": "enemy",
+		"hp": ed.get("hp", 10),
+		"attack": ed.get("attack", 5),
+		"defense": ed.get("defense", 0),
+		"tile_index": current_tile_index,
+		"from_card": enemy_card.get("id", "")
+	}
+	battle_started.emit(battle_data)
 	
 	# 暂停移动直到战斗结束
 	# 注意：不直接调用stop_hero_movement()，而是只设置is_moving为false
