@@ -278,7 +278,7 @@ func place_card(card_index: int, tile_index: int, loop_manager: Node) -> bool:
 		# 抽取新卡牌
 		draw_cards(cards_per_draw)
 		
-		print("Placed card '", card_data.name, "' at tile ", tile_index)
+		print("Placed card '", card_data.get("name", "UNKNOWN"), "' at tile ", tile_index)
 		return true
 	else:
 		return false
@@ -290,7 +290,7 @@ func remove_card_from_tile(tile_index: int, loop_manager: Node) -> Dictionary:
 	if removed_card != null and removed_card.size() > 0:
 		var position = loop_manager.get_tile_position(tile_index)
 		card_removed.emit(removed_card, position)
-		print("Removed card '", removed_card.name, "' from tile ", tile_index)
+		print("Removed card '", removed_card.get("name", "UNKNOWN"), "' from tile ", tile_index)
 	
 	return removed_card
 
@@ -300,7 +300,7 @@ func add_card_to_deck(card_id: String):
 		var new_card = card_database[card_id].duplicate()
 		player_deck.append(new_card)
 		deck_updated.emit(player_deck)
-		print("Added card '", new_card.name, "' to deck")
+		print("Added card '", new_card.get("name", "UNKNOWN"), "' to deck")
 		return true
 	else:
 		print("Card not found in database: ", card_id)

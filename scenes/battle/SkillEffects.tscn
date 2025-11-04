@@ -1,0 +1,23 @@
+[gd_scene load_steps=2 format=3 uid="uid://e0xvn1ywqxqxt"]
+
+[ext_resource type="Script" path="res://scripts/battle/BattleEffectsManager.gd" id="1_3hdq0"]
+
+[node name="SkillEffects" type="Node2D"]
+script = ExtResource("1_3hdq0")
+
+[node name="ParticleContainer" type="Node2D" parent="."]
+
+[node name="EffectContainer" type="Node2D" parent="."]
+
+[node name="LightContainer" type="Node2D" parent="."]
+
+[node name="ScreenEffects" type="CanvasLayer" parent="."]
+
+[node name="ScreenFlash" type="ColorRect" parent="ScreenEffects"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(1, 1, 1, 0)
+mouse_filter = 2
+
+[node name="ScreenShake" type="Node" parent="ScreenEffects"]

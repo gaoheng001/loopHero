@@ -9,9 +9,13 @@
 [ext_resource type="Script" uid="uid://cwgsrcpw2xean" path="res://scripts/BattleManager.gd" id="5_4k8bc"]
 [ext_resource type="PackedScene" uid="uid://bvkxqy8r1n3ys" path="res://scenes/BattleWindow.tscn" id="6_battle"]
 [ext_resource type="PackedScene" path="res://scenes/CardSelectionWindow.tscn" id="7_card_selection"]
+[ext_resource type="PackedScene" uid="uid://bvkxqy8r1n4ys" path="res://scenes/GameOverWindow.tscn" id="8_game_over"]
 [ext_resource type="Texture2D" uid="uid://bfm52t3lcic8d" path="res://resources/images/walk.png" id="10_rtryj"]
 [ext_resource type="Texture2D" uid="uid://b71pfxeoxh1o7" path="res://resources/images/skeleton_idle.png" id="11_vs82q"]
 [ext_resource type="Script" path="res://scripts/StartButtonProxy.gd" id="12_start_btn"]
+[ext_resource type="Script" path="res://test_hit_animation.gd" id="13_test_hit"]
+[ext_resource type="Script" path="res://test_enhanced_hit_animation.gd" id="14_enhanced_hit"]
+
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_1hpqh"]
 texture = ExtResource("4_fpdtd")
@@ -2374,8 +2378,11 @@ text = "[color=gray]等待游戏开始...[/color]"
 fit_content = true
 
 [node name="BattleWindow" parent="UI" instance=ExtResource("6_battle")]
+visible = false
 
 [node name="CardSelectionWindow" parent="UI" instance=ExtResource("7_card_selection")]
+
+[node name="GameOverWindow" parent="UI" instance=ExtResource("8_game_over")]
 
 [connection signal="pressed" from="UI/MainUI/BottomPanel/ControlsContainer/StartButton" to="." method="_on_start_button_pressed"]
 [connection signal="pressed" from="UI/MainUI/BottomPanel/ControlsContainer/RetreatButton" to="." method="_on_retreat_button_pressed"]
@@ -2408,3 +2415,6 @@ frame_progress = 0.995322
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Kugu"]
 scale = Vector2(13, 13)
 shape = SubResource("RectangleShape2D_qnsrl")
+
+[node name="TestEnhancedHitAnimation" type="Node" parent="."]
+script = ExtResource("14_enhanced_hit")

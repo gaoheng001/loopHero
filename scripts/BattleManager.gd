@@ -52,7 +52,7 @@ func start_battle(enemy: Dictionary, hero_mgr: Node = null, loop_mgr: Node = nul
 	
 	# 初始化战斗数据
 	enemy_data = enemy.duplicate()
-	original_enemy_hp = enemy_data.hp
+	original_enemy_hp = int(enemy_data.get("hp", 0))
 	
 	if hero_manager:
 		hero_data = hero_manager.get_stats()
@@ -75,11 +75,10 @@ func start_battle(enemy: Dictionary, hero_mgr: Node = null, loop_mgr: Node = nul
 	battle_started.emit(hero_data, enemy_data)
 	
 	_add_battle_log("战斗开始！")
-	_add_battle_log("英雄 vs " + enemy_data.name)
-	_add_battle_log("英雄生命值: " + str(hero_data.current_hp) + "/" + str(hero_data.max_hp))
-	_add_battle_log("敌人生命值: " + str(enemy_data.hp))
+	_add_battle_log("英雄 vs " + String(enemy_data.get("name", "未知敌人")))
+	_add_battle_log("敌人生命值: " + str(int(enemy_data.get("hp", 0))))
 	
-	print("Battle started: Hero vs ", enemy_data.name)
+	print("Battle started: Hero vs ", String(enemy_data.get("name", "Unknown")))
 	
 	# 开始战斗循环
 	if auto_battle:
@@ -93,7 +92,7 @@ func _start_auto_battle():
 		_hero_attack()
 		
 		# 检查敌人是否死亡
-		if enemy_data.hp <= 0:
+		if int(enemy_data.get("hp", 0)) <= 0:
 			_end_battle(true)
 			break
 		
@@ -115,36 +114,28 @@ func _start_auto_battle():
 
 func _hero_attack():
 	"""英雄攻击"""
-	# 播放攻击动画
-	if battle_window:
-		battle_window.show_attack_animation("Hero")
-	
 	var damage = _calculate_hero_damage()
 	var actual_damage = _apply_damage_to_enemy(damage)
 	
 	# 显示伤害效果
-	if battle_window:
+	if battle_window and battle_window.has_method("show_damage_effect"):
 		battle_window.show_damage_effect("Enemy", actual_damage)
 	
-	damage_dealt.emit("Hero", enemy_data.name, actual_damage)
+	damage_dealt.emit("Hero", String(enemy_data.get("name", "Unknown")), actual_damage)
 	_add_battle_log("英雄攻击造成 " + str(actual_damage) + " 点伤害")
-	_add_battle_log(enemy_data.name + " 剩余生命值: " + str(enemy_data.hp))
+	_add_battle_log(String(enemy_data.get("name", "Unknown")) + " 剩余生命值: " + str(int(enemy_data.get("hp", 0))))
 
 func _enemy_attack():
 	"""敌人攻击"""
-	# 播放攻击动画
-	if battle_window:
-		battle_window.show_attack_animation("Enemy")
-	
 	var damage = _calculate_enemy_damage()
 	var actual_damage = _apply_damage_to_hero(damage)
 	
 	# 显示伤害效果
-	if battle_window:
+	if battle_window and battle_window.has_method("show_damage_effect"):
 		battle_window.show_damage_effect("Hero", actual_damage)
 	
-	damage_dealt.emit(enemy_data.name, "Hero", actual_damage)
-	_add_battle_log(enemy_data.name + " 攻击造成 " + str(actual_damage) + " 点伤害")
+	damage_dealt.emit(String(enemy_data.get("name", "Unknown")), "Hero", actual_damage)
+	_add_battle_log(String(enemy_data.get("name", "Unknown")) + " 攻击造成 " + str(actual_damage) + " 点伤害")
 	_add_battle_log("英雄剩余生命值: " + str(hero_data.current_hp) + "/" + str(hero_data.max_hp))
 
 func _calculate_hero_damage() -> int:
@@ -178,8 +169,8 @@ func _apply_damage_to_enemy(damage: int) -> int:
 	var enemy_defense = enemy_data.get("defense", 0)
 	var actual_damage = max(1, damage - enemy_defense)
 	
-	enemy_data.hp -= actual_damage
-	enemy_data.hp = max(0, enemy_data.hp)
+	enemy_data["hp"] = int(enemy_data.get("hp", 0)) - actual_damage
+	enemy_data["hp"] = max(0, int(enemy_data.get("hp", 0)))
 	
 	return actual_damage
 
@@ -242,7 +233,7 @@ func _calculate_victory_rewards() -> Dictionary:
 		spirit_reward = 50
 
 	if enemy_data.has("rewards"):
-		rewards.resources = enemy_data.rewards.duplicate()
+		rewards.resources = (enemy_data.get("rewards", {})).duplicate()
 		# 追加灵石奖励
 		rewards.resources["spirit_stones"] = rewards.resources.get("spirit_stones", 0) + spirit_reward
 	else:
@@ -321,7 +312,7 @@ func _add_battle_log(message: String):
 	battle_log_updated.emit(message)
 	
 	# 同时更新战斗窗口的日志
-	if battle_window:
+	if battle_window and battle_window.has_method("add_battle_log"):
 		battle_window.add_battle_log(message)
 	
 	print("[Battle] ", message)
@@ -382,8 +373,8 @@ func apply_special_effect(effect_name: String, data: Dictionary = {}):
 func _apply_poison_effect(data: Dictionary):
 	"""应用毒素效果"""
 	var damage = data.get("damage", 5)
-	enemy_data.hp -= damage
-	_add_battle_log(enemy_data.name + " 受到毒素伤害: " + str(damage))
+	enemy_data["hp"] = int(enemy_data.get("hp", 0)) - damage
+	_add_battle_log(String(enemy_data.get("name", "Unknown")) + " 受到毒素伤害: " + str(damage))
 
 func _apply_heal_effect(data: Dictionary):
 	"""应用治疗效果"""
@@ -400,5 +391,5 @@ func _apply_attack_buff(data: Dictionary):
 func _apply_defense_debuff(data: Dictionary):
 	"""应用防御力减益"""
 	var debuff_amount = data.get("amount", 3)
-	enemy_data.defense = max(0, enemy_data.get("defense", 0) - debuff_amount)
-	_add_battle_log(enemy_data.name + " 防御力降低 " + str(debuff_amount))
+	enemy_data["defense"] = max(0, int(enemy_data.get("defense", 0)) - debuff_amount)
+	_add_battle_log(String(enemy_data.get("name", "Unknown")) + " 防御力降低 " + str(debuff_amount))

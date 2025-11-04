@@ -25,6 +25,7 @@ const GRID_TILE_SIZE = 16  # 每个网格瓦片的基础大小，与TileSet的te
 # 时间系统配置
 const STEPS_PER_DAY = 20
 
+
 # 路径类型：仅支持自定义瓦片路径
 # 从TileMapLayer中检测路径瓦片生成路径
 
@@ -39,6 +40,8 @@ var placed_terrain_cards: Dictionary = {}  # tile_index -> terrain_card_data
 var just_finished_battle: bool = false  # 刚刚结束战斗的标记
 var selection_active: bool = false  # 卡牌选择或交互暂停标记
 var step_count: int = 0  # 步数计数器
+var pending_tile_event: bool = false  # 选择窗口期间挂起的瓦片事件，需要在恢复移动时处理
+var pending_tile_event_index: int = -1  # 挂起的瓦片事件目标索引，避免中断时索引回退导致事件丢失
 
 # 调试：是否绘制路径线（已有路径瓦片可视，不再需要）
 var show_path_debug_lines: bool = false
@@ -199,34 +202,135 @@ func _initialize_level1_map():
 
 func start_hero_movement():
 	"""开始英雄移动"""
-	if selection_active:
-		print("[LoopManager] Selection active, not starting movement")
+	print("[LoopManager] start_hero_movement called")
+	print("[LoopManager] selection_active: ", selection_active)
+	print("[LoopManager] is_moving: ", is_moving)
+	print("[LoopManager] loop_path.size(): ", loop_path.size())
+	
+	# 检查游戏状态，如果游戏结束则不开始移动
+	var game_manager = get_node_or_null("../GameManager")
+	if game_manager and game_manager.current_state == GameManager.GameState.GAME_OVER:
+		print("[LoopManager] Game over - not starting movement")
 		return
-	if not is_moving:
-		is_moving = true
-		# 只在英雄位置未初始化时才设置到起始位置
-		if hero_node and loop_path.size() > 0:
-			# 如果hero_position还没有初始化（Vector2.ZERO），则设置到起始位置
-			if hero_position == Vector2.ZERO:
-				hero_node.position = loop_path[0]
-				hero_position = loop_path[0]
-			else:
-				# 保持当前位置，确保hero_node与hero_position同步
-				hero_node.position = hero_position
-		queue_redraw()  # 初始绘制
+	
+	if selection_active or is_moving or loop_path.size() == 0:
+		print("[LoopManager] Cannot start movement - conditions not met")
+		return
+	
+	# 初始化英雄位置
+	current_tile_index = 0
+	hero_position = loop_path[0]
+	if hero_node:
+		hero_node.position = hero_position
+	
+	is_moving = true
+	print("[LoopManager] Hero movement started, moving to first tile")
+	_move_to_next_tile()
+
+func resume_hero_movement():
+	"""从当前位置恢复英雄移动（不重置到起点）"""
+	print("[LoopManager] resume_hero_movement called")
+	print("[LoopManager] selection_active: ", selection_active)
+	print("[LoopManager] is_moving: ", is_moving)
+	print("[LoopManager] current_tile_index: ", current_tile_index)
+	
+	# 检查游戏状态，如果游戏结束则不恢复移动
+	var game_manager = get_node_or_null("../GameManager")
+	if game_manager and game_manager.current_state == GameManager.GameState.GAME_OVER:
+		print("[LoopManager] Game over - not resuming movement")
+		return
+	
+	if selection_active or loop_path.size() == 0:
+		print("[LoopManager] Cannot resume movement - selection_active or empty path")
+		return
+	if is_moving:
+		print("[LoopManager] Already moving, no need to resume")
+		return
+	# 同步当前位置，不改变索引
+	if hero_node:
+		hero_position = hero_node.position
+	elif current_tile_index >= 0 and current_tile_index < loop_path.size():
+		hero_position = loop_path[current_tile_index]
+	is_moving = true
+	print("[LoopManager] Resuming movement from tile ", current_tile_index)
+	# 若有挂起的瓦片事件，优先在当前瓦片处理一次，再决定是否继续移动
+	if pending_tile_event:
+		var target_index := current_tile_index
+		if pending_tile_event_index >= 0 and pending_tile_event_index < loop_path.size():
+			target_index = pending_tile_event_index
+		print("[LoopManager] Processing pending tile event at tile ", target_index, " (current=", current_tile_index, ")")
+		pending_tile_event = false
+		pending_tile_event_index = -1
+		# 将英雄位置校正到该目标瓦片，避免跨越导致视觉跳变；然后按该瓦片触发事件
+		if hero_node:
+			hero_node.position = loop_path[target_index]
+			hero_position = hero_node.position
+		else:
+			hero_position = loop_path[target_index]
+		# 设置索引为目标瓦片索引，确保事件中使用相同索引
+		current_tile_index = target_index
+		hero_moved.emit(loop_path[target_index])
+		_on_tile_reached(loop_path[target_index])
+		# 如果在瓦片事件中触发了战斗，is_moving 会被置为 false，此时不继续移动
+		if is_moving:
+			_move_to_next_tile()
+		else:
+			print("[LoopManager] Movement paused/stopped after pending tile event processing")
+	else:
 		_move_to_next_tile()
 
 func stop_hero_movement():
 	"""停止英雄移动"""
 	is_moving = false
-	# 停止walk动画
+	_interrupt_current_move()
 	if hero_node:
 		var animated_sprite = hero_node.get_node("AnimatedSprite2D")
 		if animated_sprite:
 			animated_sprite.stop()
 
+func pause_hero_movement():
+	"""暂停英雄移动（不中断循环状态）"""
+	is_moving = false
+	_interrupt_current_move()
+	if hero_node:
+		var animated_sprite = hero_node.get_node("AnimatedSprite2D")
+		if animated_sprite:
+			animated_sprite.stop()
+
+# 在选择窗口或显式停止时，强制中断未完成的移动步骤
+func _interrupt_current_move():
+	if movement_tween:
+		movement_tween.kill()
+		movement_tween = null
+	# 如果当前tile索引指向一个目标位置但英雄尚未到达，则将索引回退
+	if loop_path.size() > 0 and current_tile_index >= 0 and current_tile_index < loop_path.size():
+		var target_pos = loop_path[current_tile_index]
+		var reached = false
+		if hero_node:
+			reached = (hero_node.position == target_pos)
+		else:
+			reached = (hero_position == target_pos)
+		if not reached:
+			# 回退索引到上一个瓦片，保持当前位置为暂停位置
+			current_tile_index = (current_tile_index - 1 + loop_path.size()) % loop_path.size()
+			if hero_node:
+				hero_position = hero_node.position
+
 func _move_to_next_tile():
 	"""移动到下一个瓦片"""
+	# 检查游戏状态，如果游戏结束则停止移动
+	var game_manager = get_node_or_null("../GameManager")
+	if game_manager and game_manager.current_state == GameManager.GameState.GAME_OVER:
+		is_moving = false
+		print("[LoopManager] Game over - stopping movement")
+		return
+	
+	# 当选择窗口活动时，严禁推进移动，防止在连续选择期间误前进
+	if selection_active:
+		is_moving = false
+		print("[LoopManager] Selection active - not moving to next tile")
+		return
+	
 	if not is_moving or loop_path.size() == 0:
 		return
 	
@@ -251,6 +355,7 @@ func _move_to_next_tile():
 				# 主要是垂直移动
 				should_flip = delta_y > 0  # 从上往下移动
 			
+			# 恢复误删的镜像设置
 			animated_sprite.flip_h = should_flip
 	
 	# 确保之前的 tween 被停止
@@ -305,6 +410,11 @@ func _on_hero_position_update(position: Vector2):
 
 func _on_movement_completed():
 	"""移动完成回调"""
+	# 在暂停或已停止时直接忽略回调，避免错误推进一步或触发事件
+	if selection_active or not is_moving:
+		print("[LoopManager] Movement completion ignored due to pause/stop")
+		return
+	
 	# 同步内部位置到节点
 	if hero_node:
 		hero_position = hero_node.position
@@ -320,16 +430,27 @@ func _on_movement_completed():
 		day_changed.emit(current_day)
 		# 新的一天开始时生成怪物
 		_spawn_monsters_for_new_day()
+		# 可能在day_changed信号处理期间激活了选择窗口，此时应立即停止后续处理
+		if selection_active:
+			is_moving = false
+			print("[LoopManager] Selection activated during day change, halting movement completion")
+			return
 
-	# 若选择窗口处于活动状态，确保暂停移动
-	if selection_active:
-		is_moving = false
-		print("[LoopManager] Selection active after movement complete, pausing movement")
-	
 	# 检查是否完成一圈
 	if current_tile_index == 0:
 		print("[LoopManager] Loop completed, emitting loop_completed signal")
 		loop_completed.emit()
+		# 如果在循环完成后选择窗口处于活动状态，也应停止后续处理
+		if selection_active:
+			is_moving = false
+			print("[LoopManager] Selection active after loop completion, halting post-move processing")
+			return
+	
+	# 在发射hero_moved和tile_reached之前再次校验选择状态
+	if selection_active:
+		is_moving = false
+		print("[LoopManager] Selection active before tile_reached, skipping signals")
+		return
 	
 	# 发射hero_moved信号，确保只有在移动完成后才处理瓦片事件
 	hero_moved.emit(loop_path[current_tile_index])
@@ -377,13 +498,13 @@ func _on_tile_reached(tile_position: Vector2):
 		# 优先检查该位置是否有怪物
 		if current_tile_index in spawned_monsters:
 			var monster_data = spawned_monsters[current_tile_index]
-			print("Found monster at tile ", current_tile_index, ": ", monster_data.type)
+			print("Found monster at tile ", current_tile_index, ": ", monster_data.get("type", "UNKNOWN"))
 			_trigger_monster_battle(monster_data)
 			has_battle = true
 		# 如果没有怪物，检查该位置是否有卡牌
 		elif current_tile_index in placed_cards:
 			var card_data = placed_cards[current_tile_index]
-			print("Found card at tile ", current_tile_index, ": ", card_data.name)
+			print("Found card at tile ", current_tile_index, ": ", card_data.get("name", "UNKNOWN"))
 			# 检查是否是敌人卡牌，如果是则标记为已触发战斗
 			if card_data.get("type") == "enemy":
 				has_battle = true
@@ -395,7 +516,8 @@ func _on_tile_reached(tile_position: Vector2):
 
 func _handle_card_effect(card_data: Dictionary):
 	"""处理卡牌效果"""
-	match card_data.type:
+	var ctype := String(card_data.get("type", ""))
+	match ctype:
 		"enemy":
 			_trigger_battle(card_data)
 		"terrain":
@@ -407,25 +529,31 @@ func _handle_card_effect(card_data: Dictionary):
 
 func _trigger_monster_battle(monster_data: Dictionary):
 	"""触发怪物战斗"""
-	print("Monster battle triggered with ", monster_data.type)
+	print("Monster battle triggered with ", monster_data.get("type", "UNKNOWN"))
 	# 创建战斗数据，格式与卡牌战斗兼容
 	var battle_data = {
-		"name": monster_data.type,
+		"name": monster_data.get("type", "UNKNOWN"),
 		"type": "enemy",
-		"hp": monster_data.health,  # 使用hp字段以兼容BattleManager
-		"attack": monster_data.attack,
+		"hp": monster_data.get("health", 0),  # 使用hp字段以兼容BattleManager
+		"attack": monster_data.get("attack", 0),
 		"defense": monster_data.get("defense", 0),
 		"is_monster": true,
 		"tile_index": current_tile_index
 	}
+	print("[LoopManager] *** EMITTING battle_started signal *** with data:", battle_data)
 	battle_started.emit(battle_data)
 	
 	# 暂停移动直到战斗结束
 	is_moving = false
+	# 停止walk动画（与卡牌战斗触发一致）
+	if hero_node:
+		var animated_sprite = hero_node.get_node("AnimatedSprite2D")
+		if animated_sprite:
+			animated_sprite.stop()
 
 func _trigger_battle(enemy_card: Dictionary):
 	"""触发战斗"""
-	print("Battle triggered with ", enemy_card.name)
+	print("Battle triggered with ", enemy_card.get("name", "Enemy"))
 	# 将卡牌数据转换为战斗数据，兼容 BattleManager 期望的字段
 	var ed: Dictionary = enemy_card.get("enemy_data", {})
 	var battle_data: Dictionary = {
@@ -451,12 +579,12 @@ func _trigger_battle(enemy_card: Dictionary):
 
 func _apply_terrain_effect(terrain_card: Dictionary):
 	"""应用地形效果"""
-	print("Applying terrain effect: ", terrain_card.name)
+	print("Applying terrain effect: ", terrain_card.get("name", "Unknown"))
 	# TODO: 实现具体的地形效果
 
 func _apply_building_effect(building_card: Dictionary):
 	"""应用建筑效果"""
-	print("Applying building effect: ", building_card.name)
+	print("Applying building effect: ", building_card.get("name", "Unknown"))
 	# TODO: 实现具体的建筑效果
 
 func _apply_special_effect(special_card: Dictionary):
@@ -488,7 +616,7 @@ func place_card_at_tile(tile_index: int, card_data: Dictionary):
 	"""在指定瓦片放置卡牌"""
 	if tile_index >= 0 and tile_index < loop_path.size():
 		placed_cards[tile_index] = card_data
-		print("Placed card '", card_data.name, "' at tile ", tile_index)
+		print("Placed card '", card_data.get("name", "UNKNOWN"), "' at tile ", tile_index)
 		return true
 	else:
 		print("Invalid tile index: ", tile_index)
@@ -499,7 +627,7 @@ func remove_card_at_tile(tile_index: int):
 	if tile_index in placed_cards:
 		var removed_card = placed_cards[tile_index]
 		placed_cards.erase(tile_index)
-		print("Removed card '", removed_card.name, "' from tile ", tile_index)
+		print("Removed card '", removed_card.get("name", "UNKNOWN"), "' from tile ", tile_index)
 		return removed_card
 	else:
 		print("No card at tile ", tile_index)
@@ -555,17 +683,33 @@ func on_battle_ended(victory: bool, rewards: Dictionary = {}):
 	else:
 		print("Battle lost! Hero died...")
 		# 战斗失败，英雄死亡
-		var game_manager = get_node_or_null("/root/GameManager")
+		var game_manager = get_node_or_null("../GameManager")
 		if game_manager and game_manager.has_method("hero_death"):
 			game_manager.hero_death()
+		else:
+			print("[LoopManager] ERROR: Could not access GameManager to call hero_death()")
 
 func on_battle_window_closed():
-	"""战斗窗口关闭后的处理"""
-	print("Battle window closed, resuming movement...")
-	if just_finished_battle:
-		if not selection_active:
-			is_moving = true
-			_move_to_next_tile()
+	"""战斗窗口关闭处理"""
+	print("[LoopManager] Battle window closed, resuming movement...")
+	print("[LoopManager] just_finished_battle: ", just_finished_battle)
+	print("[LoopManager] selection_active: ", selection_active)
+	print("[LoopManager] current is_moving: ", is_moving)
+	
+	# 检查游戏状态，如果游戏结束则不恢复移动
+	var game_manager = get_node_or_null("../GameManager")
+	if game_manager and game_manager.current_state == GameManager.GameState.GAME_OVER:
+		print("[LoopManager] Game over - not resuming movement")
+		return
+	
+	# 无论 just_finished_battle 状态如何，都应该恢复移动
+	# 因为战斗窗口关闭意味着战斗已经完全结束
+	if not selection_active:
+		is_moving = true
+		print("[LoopManager] Resuming movement after battle window closed")
+		_move_to_next_tile()
+	else:
+		print("[LoopManager] Selection is active, not resuming movement")
 
 # 路径类型相关函数已移除，现在只支持自定义瓦片路径
 
@@ -602,14 +746,14 @@ func _spawn_initial_monsters():
 		var tile_index = available_tiles[random_index]
 		available_tiles.remove_at(random_index)
 		
-		# 创建怪物数据（初始怪物较弱）
+		# 创建怪物数据（调整血量以便观察小队整体行动）
 		var monster_types = ["Yaokou", "Kugu", "Zhumu"]
 		var monster_type = monster_types[randi() % monster_types.size()]
 		var monster_data = {
 			"type": monster_type,
-			"health": 20,  # 初始怪物血量较低
-			"attack": 5,   # 初始怪物攻击力较低
-			"defense": 1,  # 初始怪物防御力较低
+			"health": 50,  # 基础怪物血量设为50点
+			"attack": 8,   # 适中的攻击力
+			"defense": 5,  # 增加防御力
 			"day_spawned": current_day
 		}
 		
@@ -654,8 +798,9 @@ func _spawn_monsters_for_new_day():
 		var monster_type = monster_types[randi() % monster_types.size()]
 		var monster_data = {
 			"type": monster_type,
-			"health": 30 + current_day * 5,  # 随天数增加血量
-			"attack": 8 + current_day * 2,   # 随天数增加攻击力
+			"health": 50 + current_day * 10,  # 基础血量50点，每天增加10点
+			"attack": 10 + current_day * 3,   # 随天数增加攻击力
+			"defense": 5 + current_day * 2,   # 大幅增加防御力
 			"day_spawned": current_day
 		}
 		
@@ -827,7 +972,7 @@ func place_terrain_card(tile_index: int, card_data: Dictionary):
 	"""在指定瓦片放置地形卡牌（旧版本，保持兼容性）"""
 	if can_place_terrain_at_tile(tile_index):
 		placed_terrain_cards[tile_index] = card_data
-		print("[LoopManager] 在瓦片", tile_index, "放置地形卡牌：", card_data.name)
+		print("[LoopManager] 在瓦片", tile_index, "放置地形卡牌：", card_data.get("name", "UNKNOWN"))
 		
 		# 创建地形卡牌的视觉表示
 		_create_terrain_visual(tile_index, card_data)
@@ -838,7 +983,7 @@ func place_terrain_card_at_grid_position(grid_pos: Vector2i, card_data: Dictiona
 	"""在指定网格位置放置地形卡牌"""
 	if can_place_terrain_at_grid_position(grid_pos):
 		grid_terrain_cards[grid_pos] = card_data
-		print("[LoopManager] 在网格位置", grid_pos, "放置地形卡牌：", card_data.name)
+		print("[LoopManager] 在网格位置", grid_pos, "放置地形卡牌：", card_data.get("name", "UNKNOWN"))
 		
 		# 创建地形卡牌的视觉表示
 		_create_terrain_visual_at_grid(grid_pos, card_data)
@@ -860,7 +1005,8 @@ func _create_terrain_visual(tile_index: int, card_data: Dictionary):
 	
 	# 根据地形类型设置颜色
 	var color: Color
-	match card_data.id:
+	var cid := String(card_data.get("id", ""))
+	match cid:
 		"bamboo_forest":
 			color = Color.GREEN
 		"mountain_peak":
@@ -901,7 +1047,7 @@ func _create_terrain_visual(tile_index: int, card_data: Dictionary):
 
 func _create_terrain_visual_at_grid(grid_pos: Vector2i, card_data: Dictionary):
 	"""创建地形卡牌的视觉表示（基于TileMapLayer网格）"""
-	print("[LoopManager] 开始创建地形视觉 - 网格位置:", grid_pos, "卡牌:", card_data.name)
+	print("[LoopManager] 开始创建地形视觉 - 网格位置:", grid_pos, "卡牌:", card_data.get("name", "UNKNOWN"))
 	
 	# 检查TileMapLayer是否存在
 	if not tile_map_layer:
@@ -922,7 +1068,8 @@ func _create_terrain_visual_at_grid(grid_pos: Vector2i, card_data: Dictionary):
 	
 	# 根据卡牌ID设置颜色
 	var color: Color
-	match card_data.id:
+	var cid = String(card_data.get("id", ""))
+	match cid:
 		"bamboo_forest":
 			color = Color.GREEN
 		"mountain_peak":
@@ -959,7 +1106,7 @@ func _create_terrain_visual_at_grid(grid_pos: Vector2i, card_data: Dictionary):
 	# 创建文字标签
 	var terrain_label = Label.new()
 	terrain_label.name = "TerrainLabel_" + str(grid_pos.x) + "_" + str(grid_pos.y)
-	terrain_label.text = card_data.name.substr(0, 1)  # 获取名字的第一个字
+	terrain_label.text = String(card_data.get("name", "UNKNOWN")).substr(0, 1)  # 获取名字的第一个字
 	terrain_label.add_theme_font_size_override("font_size", 24)
 	terrain_label.add_theme_color_override("font_color", Color.WHITE)
 	terrain_label.add_theme_color_override("font_shadow_color", Color.BLACK)
@@ -1030,7 +1177,7 @@ func remove_terrain_at_grid_position(grid_pos: Vector2i):
 			grid_terrain_sprites[grid_pos].queue_free()
 			grid_terrain_sprites.erase(grid_pos)
 		
-		print("[LoopManager] 移除TileMapLayer位置", grid_pos, "的地形卡牌：", removed_card.name)
+		print("[LoopManager] 移除TileMapLayer位置", grid_pos, "的地形卡牌：", removed_card.get("name", "UNKNOWN"))
 	else:
 		print("[LoopManager] TileMapLayer位置", grid_pos, "没有地形卡牌可移除")
 
@@ -1328,6 +1475,11 @@ func set_selection_active(active: bool):
 	"""设置选择窗口活动状态，活动时强制暂停移动"""
 	selection_active = active
 	if selection_active:
+		if is_moving:
+			# 记录当前正在移动的目标索引，避免中断时索引回退导致事件丢失
+			pending_tile_event = true
+			pending_tile_event_index = current_tile_index
+			print("[LoopManager] Selection active; pending tile event recorded at index ", pending_tile_event_index)
 		is_moving = false
+		_interrupt_current_move()
 		print("[LoopManager] Selection active set, pausing movement")
-

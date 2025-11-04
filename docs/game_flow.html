@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LoopHero 游戏流程图</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 24px; background: #0f172a; color: #e2e8f0; }
+    h1, h2 { margin: 0 0 12px; }
+    h1 { font-size: 24px; }
+    h2 { font-size: 18px; color: #93c5fd; }
+    .section { margin-bottom: 28px; padding: 16px; background: #111827; border: 1px solid #1f2937; border-radius: 8px; }
+    .mermaid { background: #0b1220; border-radius: 8px; padding: 12px; }
+    .desc { margin: 8px 0 16px; color: #9ca3af; font-size: 14px; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 24px; }
+    @media (min-width: 1200px) { .grid { grid-template-columns: 1fr 1fr; } }
+  </style>
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'dark' });</script>
+</head>
+<body>
+  <h1>LoopHero 游戏流程图</h1>
+  <p class="desc">包含：整体主循环、卡牌选择与放置、队伍战斗时序、移动状态守卫。</p>
+
+  <div class="section">
+    <h2>整体主循环</h2>
+    <div class="mermaid">
+flowchart TD
+    A["启动 MainGame.tscn"] --> B["MainGameController._ready<br/>连接管理器/信号<br/>创建 BattleWindow"]
+    B --> C["开始新循环<br/>GameManager.start_new_loop"]
+    C --> D["LoopManager 生成路径<br/>TileMapLayer 可视化"]
+    D --> E["开始英雄移动<br/>start_hero_movement"]
+    E --> F{"selection_active?"}
+    F -->|是| G["暂停推进<br/>_interrupt_current_move"]
+    F -->|否| H["到达瓦片 tile_reached"]
+    H --> I{"遇敌?"}
+    I -->|是| J["队伍战斗<br/>BattleWindow.show_team_battle"]
+    I -->|否| K["继续下一瓦片<br/>_move_to_next_tile"]
+    J --> L["应用奖励<br/>BattleWindow 调用 LoopManager.on_battle_ended"]
+    L --> E
+    G --> M["显示卡牌选择窗口<br/>CardSelectionWindow.show_card_selection"]
+    M --> N["选择地形卡"]
+    N --> O["放置地形<br/>LoopManager.place_terrain_card"]
+    O --> P["HeroManager 应用地形效果"]
+    P --> Q["关闭选择窗口<br/>selection_closed"]
+    Q --> R["set_selection_active(false)<br/>resume_hero_movement"]
+    R --> E
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="section">
+      <h2>卡牌选择与放置流程</h2>
+      <div class="mermaid">
+sequenceDiagram
+    participant MGC as MainGameController
+    participant LM as LoopManager
+    participant CSW as CardSelectionWindow
+    participant HM as HeroManager
+
+    MGC->>LM: set_selection_active(true)
+    MGC->>CSW: show_card_selection(day)
+    CSW-->>MGC: selection_restarted
+    MGC->>LM: pause_hero_movement()
+
+    CSW-->>MGC: card_selected(card_data)
+    MGC->>LM: place_terrain_card_at_grid_position
+    LM-->>HM: add_terrain_card(card_data)
+
+    CSW-->>MGC: selection_closed
+    MGC->>LM: set_selection_active(false)
+    MGC->>LM: resume_hero_movement()
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>队伍战斗时序（TeamBattleManager）</h2>
+      <div class="mermaid">
+sequenceDiagram
+    participant LM as LoopManager
+    participant MGC as MainGameController
+    participant BW as BattleWindow
+    participant TBM as TeamBattleManager
+
+    LM-->>MGC: on_battle_started(enemy_data)
+    MGC->>BW: show_team_battle(hero_roster, enemy_roster)
+    BW->>TBM: start_battle(heroes, enemies)
+
+    loop 自动回合
+      TBM->>TBM: execute_turn()
+      TBM-->>BW: log_message("[TBM] ...")
+      TBM-->>BW: turn_started(side)
+    end
+
+    TBM-->>BW: battle_finished(result, stats)
+    BW->>LM: on_battle_ended(victory, rewards)
+    BW->>BW: hide_battle()
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>移动状态守卫</h2>
+    <div class="mermaid">
+flowchart LR
+    A["Hero 移动状态"] --> B{"selection_active?"}
+    B -->|true| C["中断当前移动<br/>_interrupt_current_move"]
+    C --> D["索引保持<br/>不前进"]
+    B -->|false| E["推进到下一瓦片<br/>_move_to_next_tile"]
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>说明</h2>
+    <ul>
+      <li>已移除 headless 自动选择定时器；无头测试期间索引保持不前进。</li>
+      <li>窗口战斗已改为队伍模式；右侧战斗记录由 TBM 日志信号驱动输出到 RichTextLabel。</li>
+      <li>选择期通过 <code>selection_active</code> 严禁推进移动，关闭后恢复。</li>
+    </ul>
+  </div>
+</body>
+</html>

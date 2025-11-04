@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>循环玩法流程图</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Microsoft YaHei", sans-serif; margin: 24px; }
+    h1 { font-size: 20px; margin-bottom: 12px; }
+    .mermaid { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; }
+  </style>
+</head>
+<body>
+  <h1>循环玩法流程图</h1>
+  <div class="mermaid">
+    flowchart TD
+      A[开始: 进入循环日程] --> B[生成地形卡牌与事件]
+      B --> C{玩家放置地形卡?}
+      C -- 是 --> D[应用地形效果: 敌人/资源/路径]
+      C -- 否 --> E[跳过放置]
+      D --> E
+      E --> F[英雄沿路径移动]
+      F --> G{遇到事件/敌人?}
+      G -- 战斗 --> H[进入小队战斗]
+      G -- 事件/采集 --> I[结算事件/采集资源]
+      H --> J[战斗结算: 经验/资源/状态]
+      J --> K{英雄状态检查(HP/资源/时间)}
+      I --> K
+      K -- 休整/营地 --> L[休息/装备管理/恢复]
+      L --> M{循环结束条件?}
+      K -- 继续前进 --> M
+      M -- 未结束 --> B
+      M -- 已结束 --> N[结算当日奖励并返回主循环]
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, theme: "default" });</script>
+</body>
+</html>

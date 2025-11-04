@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>小队战斗流程图</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Microsoft YaHei", sans-serif; margin: 24px; }
+    h1 { font-size: 20px; margin-bottom: 12px; }
+    .mermaid { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; }
+  </style>
+</head>
+<body>
+  <h1>小队战斗流程图</h1>
+  <div class="mermaid">
+    graph TD
+      A[开始 BattleWindow show_team_battle] --> B[连接 TBM 信号: log turn battle_finished skill_triggered]
+      B --> C[TBM start_battle]
+      C --> D{battle_active}
+      D -->|是| E[AutoBattleTimer 调用 execute_turn]
+      E --> F[turn_started 回合 side]
+      F --> G[选择行动 普攻 技能 防御]
+      G --> H{是否技能}
+      H -->|是| I[发射 skill_triggered]
+      I --> J[BattleWindow 显示技能飘字]
+      I --> K[BattleEffectsManager 技能特效]
+      H -->|否| L[普通攻击 防御 移动]
+      J --> M[应用伤害 治疗 状态]
+      K --> M
+      L --> M
+      M --> N[更新日志 与 UI]
+      N --> O[检查胜负条件]
+      O -->|未分胜负| D
+      O -->|已分胜负| P[发射 battle_finished]
+      P --> Q[结算团队胜利奖励]
+      Q --> R[关闭窗口 返回循环系统]
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, theme: "default" });</script>
+</body>
+</html>

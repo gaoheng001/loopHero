@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>队伍战斗逻辑判断流程图（含技能/普攻分支）</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: "Microsoft YaHei", sans-serif;
+            margin: 40px;
+            background: #f7f7f7;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .mermaid {
+            text-align: center;
+            background: #fff;
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,.1);
+        }
+        .legend {
+            margin-top: 30px;
+            padding: 15px 20px;
+            background: #fff;
+            border-left: 5px solid #4caf50;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <h1>《冒险与挖矿》队伍战斗逻辑判断流程图</h1>
+
+    <div class="mermaid">
+        flowchart TD
+            A([战斗开始]) --> B[初始化：加载双方队伍数据<br>应用被动技能 计算先攻]
+            B --> C{先攻判定}
+            C -->|我方先攻| D[设定行动方 = 我方]
+            C -->|敌方先攻| E[设定行动方 = 敌方]
+            D --> F[回合开始]
+            E --> F
+            F --> G[按站位顺序遍历行动方队伍<br>1号位 → 25号位]
+            G --> H{当前角色存活?}
+            H -->|否| I[跳过 判定下一位]
+            H -->|是| J{触发主动技能且未超过次数上限?}
+            J -->|是| K[立即执行该技能<br>技能伤害/效果结算；计数+1]
+            J -->|否| L[继续遍历下一位]
+            L --> M{遍历完成?}
+            M -->|否| G
+            M -->|是| N{本回合有技能释放?}
+            N -->|是| O[本回合结束<br>直接进入回合末处理]
+            N -->|否| P[执行“全队普攻”<br>所有存活成员各打1次普攻]
+            O --> Q[回合末：状态/被动生效<br>毒伤、回复、Buff结算]
+            P --> Q
+            Q --> R{战斗结束?}
+            R -->|否| F
+            R -->|是| S[输出胜负信号<br>发放奖励]
+            S --> T([战斗结束])
+    </div>
+
+    <div class="legend">
+        <strong>关键说明：</strong><br>
+        1. 技能触发判定按站位顺序依次进行，一旦任意角色触发技能，立即释放并结束本回合，后续角色不再判定。<br>
+        2. 若遍历完所有角色仍无技能触发，则执行“全队普攻”：队伍内所有存活成员各进行一次普攻。<br>
+        3. 回合末统一处理持续状态（毒、回复、Buff）与被动效果，然后进入下一回合或结束战斗。<br>
+        4. 技能有触发次数上限：默认每种技能各 1 次；超过上限会回退为普通攻击。可通过角色技能的 <code>limit</code> 字段或全局 <code>options.skill_limits</code> 覆盖。
+    </div>
+
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</body>
+</html>

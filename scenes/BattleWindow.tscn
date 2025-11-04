@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=4 uid="uid://bvkxqy8r1n3ys"]
 
-[ext_resource type="Script" path="res://scripts/BattleWindow.gd" id="1_battle"]
+[ext_resource type="Script" path="res://scripts/BattleWindow.gd" id="1"]
 
 [node name="BattleWindow" type="Control"]
 layout_mode = 3
@@ -9,7 +9,8 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_battle")
+visible = false
+script = ExtResource("1")
 
 [node name="Background" type="ColorRect" parent="."]
 layout_mode = 1
@@ -34,7 +35,7 @@ offset_bottom = 300.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="MainContainer" type="HBoxContainer" parent="BattlePanel"]
+[node name="MainContainer" type="VBoxContainer" parent="BattlePanel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -46,117 +47,203 @@ offset_bottom = -10.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="BattleArea" type="HBoxContainer" parent="BattlePanel/MainContainer"]
+[node name="TeamHealthBars" type="HBoxContainer" parent="BattlePanel/MainContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_stretch_ratio = 2.0
+custom_minimum_size = Vector2(0, 60)
 
-[node name="HeroSection" type="VBoxContainer" parent="BattlePanel/MainContainer/BattleArea"]
+[node name="HeroTeamHealthBar" type="VBoxContainer" parent="BattlePanel/MainContainer/TeamHealthBars"]
 layout_mode = 2
 size_flags_horizontal = 3
-alignment = 1
 
-[node name="HeroLabel" type="Label" parent="BattlePanel/MainContainer/BattleArea/HeroSection"]
+[node name="HeroTeamLabel" type="Label" parent="BattlePanel/MainContainer/TeamHealthBars/HeroTeamHealthBar"]
 layout_mode = 2
-text = "英雄"
+text = "英雄队伍"
 horizontal_alignment = 1
 
-[node name="HeroSprite" type="ColorRect" parent="BattlePanel/MainContainer/BattleArea/HeroSection"]
-layout_mode = 2
-custom_minimum_size = Vector2(120, 120)
-size_flags_horizontal = 4
-color = Color(0.2, 0.6, 1, 1)
-
-[node name="HeroStats" type="VBoxContainer" parent="BattlePanel/MainContainer/BattleArea/HeroSection"]
+[node name="HeroTeamHealthContainer" type="VBoxContainer" parent="BattlePanel/MainContainer/TeamHealthBars/HeroTeamHealthBar"]
 layout_mode = 2
 
-[node name="HeroHP" type="Label" parent="BattlePanel/MainContainer/BattleArea/HeroSection/HeroStats"]
+[node name="HeroTeamHealthProgress" type="ProgressBar" parent="BattlePanel/MainContainer/TeamHealthBars/HeroTeamHealthBar/HeroTeamHealthContainer"]
 layout_mode = 2
-text = "HP: 100/100"
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="HeroTeamHealthLabel" type="Label" parent="BattlePanel/MainContainer/TeamHealthBars/HeroTeamHealthBar/HeroTeamHealthContainer"]
+layout_mode = 2
+text = "230/230"
 horizontal_alignment = 1
 
-[node name="HeroAttack" type="Label" parent="BattlePanel/MainContainer/BattleArea/HeroSection/HeroStats"]
-layout_mode = 2
-text = "攻击: 15"
-horizontal_alignment = 1
-
-[node name="HeroDefense" type="Label" parent="BattlePanel/MainContainer/BattleArea/HeroSection/HeroStats"]
-layout_mode = 2
-text = "防御: 5"
-horizontal_alignment = 1
-
-[node name="VSLabel" type="Label" parent="BattlePanel/MainContainer/BattleArea"]
+[node name="VSLabelTop" type="Label" parent="BattlePanel/MainContainer/TeamHealthBars"]
 layout_mode = 2
 size_flags_horizontal = 4
 text = "VS"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="EnemySection" type="VBoxContainer" parent="BattlePanel/MainContainer/BattleArea"]
+[node name="EnemyTeamHealthBar" type="VBoxContainer" parent="BattlePanel/MainContainer/TeamHealthBars"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="EnemyTeamLabel" type="Label" parent="BattlePanel/MainContainer/TeamHealthBars/EnemyTeamHealthBar"]
+layout_mode = 2
+text = "敌方队伍"
+horizontal_alignment = 1
+
+[node name="EnemyTeamHealthContainer" type="VBoxContainer" parent="BattlePanel/MainContainer/TeamHealthBars/EnemyTeamHealthBar"]
+layout_mode = 2
+
+[node name="EnemyTeamHealthProgress" type="ProgressBar" parent="BattlePanel/MainContainer/TeamHealthBars/EnemyTeamHealthBar/EnemyTeamHealthContainer"]
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyTeamHealthLabel" type="Label" parent="BattlePanel/MainContainer/TeamHealthBars/EnemyTeamHealthBar/EnemyTeamHealthContainer"]
+layout_mode = 2
+text = "252/252"
+horizontal_alignment = 1
+
+[node name="RoundCounter" type="HBoxContainer" parent="BattlePanel/MainContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 30)
+
+[node name="RoundLabel" type="Label" parent="BattlePanel/MainContainer/RoundCounter"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "第 1 回合"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ContentContainer" type="HBoxContainer" parent="BattlePanel/MainContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="BattleArea" type="HBoxContainer" parent="BattlePanel/MainContainer/ContentContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.2
+
+[node name="HeroSection" type="VBoxContainer" parent="BattlePanel/MainContainer/ContentContainer/BattleArea"]
 layout_mode = 2
 size_flags_horizontal = 3
 alignment = 1
 
-[node name="EnemyLabel" type="Label" parent="BattlePanel/MainContainer/BattleArea/EnemySection"]
+[node name="HeroLabel" type="Label" parent="BattlePanel/MainContainer/ContentContainer/BattleArea/HeroSection"]
+layout_mode = 2
+text = "英雄"
+horizontal_alignment = 1
+
+[node name="HeroSprite" type="ColorRect" parent="BattlePanel/MainContainer/ContentContainer/BattleArea/HeroSection"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 120)
+size_flags_horizontal = 4
+color = Color(0.2, 0.6, 1, 1)
+
+[node name="HeroStats" type="VBoxContainer" parent="BattlePanel/MainContainer/ContentContainer/BattleArea/HeroSection"]
+layout_mode = 2
+
+[node name="HeroHP" type="Label" parent="BattlePanel/MainContainer/ContentContainer/BattleArea/HeroSection/HeroStats"]
+layout_mode = 2
+text = "HP: 100/100"
+horizontal_alignment = 1
+
+[node name="HeroAttack" type="Label" parent="BattlePanel/MainContainer/ContentContainer/BattleArea/HeroSection/HeroStats"]
+layout_mode = 2
+text = "攻击: 15"
+horizontal_alignment = 1
+
+[node name="HeroDefense" type="Label" parent="BattlePanel/MainContainer/ContentContainer/BattleArea/HeroSection/HeroStats"]
+layout_mode = 2
+text = "防御: 5"
+horizontal_alignment = 1
+
+[node name="VSLabel" type="Label" parent="BattlePanel/MainContainer/ContentContainer/BattleArea"]
+layout_mode = 2
+size_flags_horizontal = 4
+text = "VS"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="EnemySection" type="VBoxContainer" parent="BattlePanel/MainContainer/ContentContainer/BattleArea"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+
+[node name="EnemyLabel" type="Label" parent="BattlePanel/MainContainer/ContentContainer/BattleArea/EnemySection"]
 layout_mode = 2
 text = "敌人"
 horizontal_alignment = 1
 
-[node name="EnemySprite" type="ColorRect" parent="BattlePanel/MainContainer/BattleArea/EnemySection"]
+[node name="EnemySprite" type="ColorRect" parent="BattlePanel/MainContainer/ContentContainer/BattleArea/EnemySection"]
 layout_mode = 2
 custom_minimum_size = Vector2(120, 120)
 size_flags_horizontal = 4
 color = Color(1, 0.2, 0.2, 1)
 
-[node name="EnemyStats" type="VBoxContainer" parent="BattlePanel/MainContainer/BattleArea/EnemySection"]
+[node name="EnemyStats" type="VBoxContainer" parent="BattlePanel/MainContainer/ContentContainer/BattleArea/EnemySection"]
 layout_mode = 2
 
-[node name="EnemyHP" type="Label" parent="BattlePanel/MainContainer/BattleArea/EnemySection/EnemyStats"]
+[node name="EnemyHP" type="Label" parent="BattlePanel/MainContainer/ContentContainer/BattleArea/EnemySection/EnemyStats"]
 layout_mode = 2
 text = "HP: 50/50"
 horizontal_alignment = 1
 
-[node name="EnemyAttack" type="Label" parent="BattlePanel/MainContainer/BattleArea/EnemySection/EnemyStats"]
+[node name="EnemyAttack" type="Label" parent="BattlePanel/MainContainer/ContentContainer/BattleArea/EnemySection/EnemyStats"]
 layout_mode = 2
 text = "攻击: 8"
 horizontal_alignment = 1
 
-[node name="EnemyDefense" type="Label" parent="BattlePanel/MainContainer/BattleArea/EnemySection/EnemyStats"]
+[node name="EnemyDefense" type="Label" parent="BattlePanel/MainContainer/ContentContainer/BattleArea/EnemySection/EnemyStats"]
 layout_mode = 2
 text = "防御: 2"
 horizontal_alignment = 1
 
-[node name="LogSection" type="VBoxContainer" parent="BattlePanel/MainContainer"]
+[node name="LogSection" type="VBoxContainer" parent="BattlePanel/MainContainer/ContentContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_stretch_ratio = 1.0
+size_flags_stretch_ratio = 0.5
+custom_minimum_size = Vector2(360, 0)
 
-[node name="LogTitle" type="Label" parent="BattlePanel/MainContainer/LogSection"]
+[node name="LogTitle" type="Label" parent="BattlePanel/MainContainer/ContentContainer/LogSection"]
 layout_mode = 2
 text = "战斗记录"
 horizontal_alignment = 1
 
-[node name="LogScrollContainer" type="ScrollContainer" parent="BattlePanel/MainContainer/LogSection"]
+[node name="ProgressLabel" type="Label" parent="BattlePanel/MainContainer/ContentContainer/LogSection"]
 layout_mode = 2
+text = "回合: - | 英雄存活 - | 敌人存活 -"
+horizontal_alignment = 1
+size_flags_horizontal = 3
+autowrap_mode = 2
+clip_text = true
+
+[node name="LogScrollContainer" type="ScrollContainer" parent="BattlePanel/MainContainer/ContentContainer/LogSection"]
+layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="LogText" type="RichTextLabel" parent="BattlePanel/MainContainer/LogSection/LogScrollContainer"]
+[node name="LogText" type="RichTextLabel" parent="BattlePanel/MainContainer/ContentContainer/LogSection/LogScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 bbcode_enabled = true
 text = "[color=gray]战斗即将开始...[/color]"
-fit_content = true
+fit_content = false
+autowrap_mode = 2
 
-[node name="ActionContainer" type="HBoxContainer" parent="BattlePanel/MainContainer/LogSection"]
+[node name="ActionContainer" type="HBoxContainer" parent="BattlePanel/MainContainer/ContentContainer/LogSection"]
 layout_mode = 2
 alignment = 1
 
-[node name="AttackButton" type="Button" parent="BattlePanel/MainContainer/LogSection/ActionContainer"]
+[node name="AttackButton" type="Button" parent="BattlePanel/MainContainer/ContentContainer/LogSection/ActionContainer"]
 layout_mode = 2
 text = "攻击"
 
-[node name="DefendButton" type="Button" parent="BattlePanel/MainContainer/LogSection/ActionContainer"]
+[node name="DefendButton" type="Button" parent="BattlePanel/MainContainer/ContentContainer/LogSection/ActionContainer"]
 layout_mode = 2
 text = "防御"
 
@@ -171,3 +258,45 @@ offset_right = -10.0
 offset_bottom = 40.0
 grow_horizontal = 0
 text = "X"
+
+[node name="AnimationArea" type="Control" parent="BattlePanel/MainContainer/ContentContainer/BattleArea"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 2
+clip_contents = true
+z_index = 100
+
+[node name="HeroAnimators" type="Control" parent="BattlePanel/MainContainer/ContentContainer/BattleArea/AnimationArea"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 50.0
+offset_top = 100.0
+offset_right = 250.0
+offset_bottom = 500.0
+mouse_filter = 2
+clip_contents = true
+
+[node name="EnemyAnimators" type="Control" parent="BattlePanel/MainContainer/ContentContainer/BattleArea/AnimationArea"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 420.0
+offset_top = 100.0
+offset_right = 620.0
+offset_bottom = 500.0
+mouse_filter = 2
+clip_contents = true
+
+[node name="EffectsLayer" type="CanvasLayer" parent="BattlePanel"]
+layer = 1
+
+[node name="BattleControls" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -110.0
+offset_right = 330.0
+offset_bottom = -10.0
+visible = false

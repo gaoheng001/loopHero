@@ -80,6 +80,36 @@ func _on_game_state_changed(new_state: GameState):
 		GameState.GAME_OVER:
 			_handle_game_over()
 
+func reset_game():
+	"""重置游戏状态"""
+	print("[GameManager] Resetting game state")
+	
+	# 重置游戏状态
+	current_state = GameState.MAIN_MENU
+	loop_number = 0
+	is_paused = false
+	
+	# 重置资源
+	resources = {
+		"wood": 0,
+		"stone": 0,
+		"metal": 0,
+		"magic_crystal": 0,
+		"food": 0,
+		"spirit_stones": 0
+	}
+	
+	# 发出信号通知其他系统
+	game_state_changed.emit(current_state)
+	resources_changed.emit(resources)
+	
+	print("[GameManager] Game reset complete")
+
+# 临时测试方法：触发Game Over
+func test_game_over():
+	print("[GameManager] Testing Game Over functionality...")
+	hero_death()
+
 func _handle_main_menu():
 	"""处理主菜单状态"""
 	get_tree().paused = false
@@ -99,6 +129,29 @@ func _handle_paused():
 func _handle_game_over():
 	"""处理游戏结束状态"""
 	get_tree().paused = false
+	print("[GameManager] Game Over - Hero has died!")
+	
+	# 显示Game Over界面
+	_show_game_over_window()
+
+func _show_game_over_window():
+	"""显示Game Over窗口"""
+	# 获取MainGameController引用
+	var main_controller = get_parent()
+	if main_controller and main_controller.has_method("show_game_over"):
+		# 获取当前游戏统计信息
+		var loop_count = loop_number
+		var step_count = 0
+		
+		# 尝试从LoopManager获取步数
+		var loop_manager = get_node_or_null("../LoopManager")
+		if loop_manager and loop_manager.has_method("get_step_count"):
+			step_count = loop_manager.get_step_count()
+		
+		print("[GameManager] Showing Game Over window with loop_count: ", loop_count, ", step_count: ", step_count)
+		main_controller.show_game_over(loop_count, step_count)
+	else:
+		print("[GameManager] ERROR: Could not access MainGameController to show Game Over window")
 
 func start_new_loop():
 	"""开始新的循环"""

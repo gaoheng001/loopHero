@@ -87,24 +87,24 @@ func _ready():
 
 func _initialize_hero():
 	"""初始化英雄数据"""
-	# 根据职业设置基础属性
+	# 根据职业设置基础属性 - 临时削弱用于测试敌方攻击动画
 	match hero_class:
 		HeroClass.WARRIOR:
-			base_stats.max_hp = 120
-			base_stats.attack = 12
-			base_stats.defense = 8
-			base_stats.magic_power = 0
-			base_stats.magic_resistance = 3
+			base_stats.max_hp = 50   # 大幅降低血量
+			base_stats.attack = 3    # 大幅降低攻击力
+			base_stats.defense = 1   # 大幅降低防御力
+			base_stats.speed = 80
+			base_stats.critical_chance = 0.1
 		HeroClass.ROGUE:
-			base_stats.max_hp = 80
-			base_stats.attack = 15
-			base_stats.defense = 3
+			base_stats.max_hp = 40   # 大幅降低血量
+			base_stats.attack = 4    # 大幅降低攻击力
+			base_stats.defense = 0   # 大幅降低防御力
 			base_stats.speed = 120
 			base_stats.critical_chance = 0.15
 		HeroClass.NECROMANCER:
-			base_stats.max_hp = 70
-			base_stats.attack = 8
-			base_stats.defense = 2
+			base_stats.max_hp = 35   # 大幅降低血量
+			base_stats.attack = 3    # 大幅降低攻击力
+			base_stats.defense = 0   # 大幅降低防御力
 			base_stats.magic_power = 20
 			base_stats.magic_resistance = 8
 	

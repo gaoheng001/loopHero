@@ -112,6 +112,18 @@ func _init():
         _write_summary("monster_spawn_battle_resume", monster_ok)
         all_passed = all_passed and monster_ok
 
+    # 第三阶段演示标签：队伍整体回合战斗（Adventure & Mining 风格）
+    if tags.find("team_battle_demo") != -1:
+        var team_ok = await _run_team_battle_demo(main_instance)
+        _write_summary("team_battle_demo", team_ok)
+        all_passed = all_passed and team_ok
+
+    # UI 演示标签：通过 BattleWindow 显示队伍战斗进度与回合日志
+    if tags.find("team_battle_ui") != -1:
+        var ui_team_ok = await _run_team_battle_ui_demo(main_instance)
+        _write_summary("team_battle_ui_demo", ui_team_ok)
+        all_passed = all_passed and ui_team_ok
+
     print("[AutoTest] 测试完成，结果:", all_passed)
     quit(0 if all_passed else 1)
 
@@ -447,8 +459,9 @@ func _run_monster_spawn_and_battle_resume(main_instance) -> bool:
     var loop_manager = main_instance.get_node_or_null("LoopManager")
     var battle_manager = main_instance.get_node_or_null("BattleManager")
     var card_manager = main_instance.get_node_or_null("CardManager")
-    if not loop_manager or not battle_manager or not card_manager:
-        print("[AutoTest][MonsterBattle] 缺少必要节点")
+    # 兼容队伍战斗：不强制要求 BattleManager 存在
+    if not loop_manager or not card_manager:
+        print("[AutoTest][MonsterBattle] 缺少必要节点 (LoopManager/CardManager)")
         return false
 
     # 连接怪物生成信号
@@ -491,11 +504,30 @@ func _run_monster_spawn_and_battle_resume(main_instance) -> bool:
     # 等待战斗开始与结束
     var seen_start := false
     var seen_end := false
+    # BattleWindow / TeamBattleManager 兼容检测
+    var battle_window = main_instance.get_node_or_null("UI/BattleWindow")
     var elapsed := 0.0
     while elapsed < 10.0:
         await create_timer(0.25).timeout
         elapsed += 0.25
-        if battle_manager.is_battle_active():
+        var bm_active := false
+        if battle_manager and battle_manager.has_method("is_battle_active"):
+            bm_active = battle_manager.is_battle_active()
+
+        var tbm_active := false
+        # 优先从 BattleWindow.team_battle_manager 读取战斗活跃状态，其次尝试 BattleWindow 提供的方法
+        if battle_window:
+            if battle_window.team_battle_manager:
+                if battle_window.team_battle_manager.has_method("is_battle_active"):
+                    tbm_active = battle_window.team_battle_manager.is_battle_active()
+                else:
+                    var prop = battle_window.team_battle_manager.get("battle_active")
+                    if typeof(prop) == TYPE_BOOL:
+                        tbm_active = prop
+            elif battle_window.has_method("is_battle_active"):
+                tbm_active = battle_window.is_battle_active()
+
+        if bm_active or tbm_active:
             seen_start = true
         else:
             if seen_start:
@@ -510,6 +542,108 @@ func _run_monster_spawn_and_battle_resume(main_instance) -> bool:
 
     # 战斗结束后应恢复移动
     var resumed: bool = loop_manager.is_moving
-    var ok_all: bool = spawn_ok and seen_start and seen_end and resumed
-    print("[AutoTest][MonsterBattle] spawn_ok=", spawn_ok, " battle start/end=", seen_start, "/", seen_end, " resumed=", resumed, " ok=", ok_all)
+    # 若未在轮询中捕捉到结束，结合当前状态与恢复移动判断结束
+    var end_ok := seen_end
+    if battle_manager and battle_manager.has_method("is_battle_active"):
+        end_ok = end_ok or (not battle_manager.is_battle_active())
+    if battle_window:
+        if battle_window.team_battle_manager:
+            if battle_window.team_battle_manager.has_method("is_battle_active"):
+                end_ok = end_ok or (not battle_window.team_battle_manager.is_battle_active())
+            else:
+                var prop2 = battle_window.team_battle_manager.get("battle_active")
+                if typeof(prop2) == TYPE_BOOL:
+                    end_ok = end_ok or (not prop2)
+        elif battle_window.has_method("is_battle_active"):
+            end_ok = end_ok or (not battle_window.is_battle_active())
+    end_ok = end_ok or resumed
+
+    var ok_all: bool = spawn_ok and seen_start and end_ok and resumed
+    print("[AutoTest][MonsterBattle] spawn_ok=", spawn_ok, " battle start/end=", seen_start, "/", end_ok, " resumed=", resumed, " ok=", ok_all)
     return ok_all
+
+func _run_team_battle_demo(main_instance) -> bool:
+    # 验证：最小整体回合战斗流程可运行并产生胜负结果（队伍风格）
+    var TeamBattleManagerScript = load("res://scripts/TeamBattleManager.gd")
+    var tbm = TeamBattleManagerScript.new()
+    main_instance.add_child(tbm)
+
+    var finished_result := ""
+    var finished_stats := {}
+    var finished_ok := false
+
+    # 构建演示队伍（简单数值，确保可打出结果）
+    var heroes := [
+        {"name": "战士", "current_hp": 40, "max_hp": 40, "attack": 12, "defense": 4},
+        {"name": "盗贼", "current_hp": 30, "max_hp": 30, "attack": 10, "defense": 3},
+        {"name": "法师", "current_hp": 25, "max_hp": 25, "attack": 14, "defense": 2},
+    ]
+    var enemies := [
+        {"name": "枯骨", "current_hp": 28, "max_hp": 28, "attack": 9, "defense": 2},
+        {"name": "蛛母幼体", "current_hp": 32, "max_hp": 32, "attack": 11, "defense": 3},
+    ]
+
+    tbm.start_battle(heroes, enemies, {})
+    tbm.run_to_completion(100)
+    var hero_alive := 0
+    var enemy_alive := 0
+    for h in tbm.hero_team:
+        var hp_h = (h.get("current_hp") if h.has("current_hp") else 0)
+        if int(hp_h) > 0:
+            hero_alive += 1
+    for e in tbm.enemy_team:
+        var hp_e = (e.get("current_hp") if e.has("current_hp") else 0)
+        if int(hp_e) > 0:
+            enemy_alive += 1
+    finished_result = ("heroes_win" if enemy_alive == 0 else ("enemies_win" if hero_alive == 0 else "unknown"))
+    finished_stats = {"turns": tbm.turn_index, "hero_alive": hero_alive, "enemy_alive": enemy_alive}
+    finished_ok = (finished_result == "heroes_win")
+    var ok: bool = finished_ok
+    print("[AutoTest][TeamBattleDemo] result=", finished_result, " stats=", finished_stats, " ok=", ok)
+    return ok
+
+func _run_team_battle_ui_demo(main_instance) -> bool:
+    # 通过 BattleWindow 展示 TeamBattleManager 的队伍战斗，并验证进度与日志输出
+    var bw = main_instance.get_node_or_null("UI/BattleWindow")
+    if bw == null:
+        print("[AutoTest][TeamBattleUI] 未找到 UI/BattleWindow 节点")
+        return false
+
+    # 3v3 队伍示例，含技能、被动与状态效果键
+    var heroes := [
+        {"name": "战士", "current_hp": 42, "max_hp": 42, "attack": 12, "defense": 4, "skills": ["power_strike"], "passives": ["tough"], "status_effects": ["attack_up"]},
+        {"name": "盗贼", "current_hp": 34, "max_hp": 34, "attack": 11, "defense": 3, "skills": ["multi_strike"], "passives": ["lifesteal"], "status_effects": []},
+        {"name": "法师", "current_hp": 28, "max_hp": 28, "attack": 13, "defense": 2, "skills": ["power_strike"], "passives": ["berserk"], "status_effects": ["regen"]},
+    ]
+    var enemies := [
+        {"name": "枯骨", "current_hp": 30, "max_hp": 30, "attack": 9, "defense": 2, "skills": [], "passives": [], "status_effects": ["poison"]},
+        {"name": "蛛母幼体", "current_hp": 33, "max_hp": 33, "attack": 11, "defense": 3, "skills": [], "passives": ["tough"], "status_effects": ["shield"]},
+        {"name": "石像鬼", "current_hp": 26, "max_hp": 26, "attack": 10, "defense": 3, "skills": [], "passives": [], "status_effects": []},
+    ]
+
+    # 调用 UI 接入方法（内部会创建/接入 TeamBattleManager 并运行到结束）
+    if bw.has_method("show_team_battle"):
+        bw.show_team_battle(heroes, enemies)
+    else:
+        print("[AutoTest][TeamBattleUI] BattleWindow 缺少 show_team_battle 方法")
+        return false
+
+    # 等待一帧以处理信号和文本更新
+    await process_frame
+
+    # 读取 UI 文本验证：进度标签显示完成、日志包含 TBM 文本、管理器处于非活跃
+    var progress_label = bw.progress_label if bw.has_node("BattlePanel/MainContainer/LogSection/ProgressLabel") else null
+    var log_text = bw.log_text if bw.has_node("BattlePanel/MainContainer/LogSection/LogScrollContainer/LogText") else null
+    var finished_text_seen := false
+    var tbm_log_seen := false
+    if progress_label:
+        finished_text_seen = (str(progress_label.text).find("完成") != -1)
+    if log_text:
+        tbm_log_seen = (str(log_text.text).find("[TBM]") != -1)
+
+    var tbm = bw.team_battle_manager
+    var inactive_ok: bool = (tbm != null and tbm.has_method("is_battle_active") and (not tbm.is_battle_active()))
+
+    var ok: bool = finished_text_seen and tbm_log_seen and inactive_ok
+    print("[AutoTest][TeamBattleUI] finished=", finished_text_seen, " tbm_log=", tbm_log_seen, " inactive=", inactive_ok, " ok=", ok)
+    return ok

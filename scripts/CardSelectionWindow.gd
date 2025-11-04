@@ -6,6 +6,7 @@ extends Control
 # 信号定义
 signal card_selected(card_data: Dictionary)
 signal selection_closed
+signal selection_restarted  # 重新开始选择时发出的信号
 
 # UI节点引用
 @onready var title_label: Label = $SelectionPanel/MainContainer/TitleLabel
@@ -34,6 +35,17 @@ var base_refresh_price: int = 5
 var refresh_increment: int = 5
 var current_day: int = 0
 
+# 更稳健的无头模式检测（支持 Windows + --headless 参数）
+func _is_headless_mode() -> bool:
+	var name := String(DisplayServer.get_name()).to_lower()
+	if name == "headless":
+		return true
+	var args: PackedStringArray = OS.get_cmdline_args()
+	for a in args:
+		if a == "--headless" or a == "headless":
+			return true
+	return OS.has_feature("headless")
+
 func _ready():
 	# 连接按钮信号
 	card1_button.pressed.connect(_on_card1_selected)
@@ -54,6 +66,7 @@ func _ready():
 
 func show_card_selection(day: int):
 	"""显示卡牌选择窗口"""
+	print("[CardSelection] show_card_selection called for day: ", day)
 	current_day = day
 	# 每日打开时重置刷新计数
 	refresh_count = 0
@@ -61,9 +74,13 @@ func show_card_selection(day: int):
 	# 检查UI组件是否可用（headless模式下可能为空）
 	if title_label:
 		title_label.text = "第" + str(day) + "天 - 选择一张卡牌"
+		print("[CardSelection] title_label updated")
+	else:
+		print("[CardSelection] title_label is null (headless mode)")
 	
 	# 生成3张随机卡牌（仅允许地形类型）
 	available_cards = _generate_random_cards()
+	print("[CardSelection] Generated cards count: ", available_cards.size())
 
 	if available_cards.size() == 0:
 		print("[CardSelection] ERROR: No cards generated! This will cause problems.")
@@ -71,23 +88,22 @@ func show_card_selection(day: int):
 	
 	# 更新UI显示
 	_update_card_display()
+	print("[CardSelection] UI display updated")
 	
 	# 显示窗口
 	visible = true
+	print("[CardSelection] Window visibility set to true, actual visible: ", visible)
+
+	# 通知主控制器选择开始，确保立即暂停英雄移动
+	if has_signal("selection_restarted"):
+		selection_restarted.emit()
 
 	# 更新刷新价格与按钮状态
 	_update_prices_and_buttons()
 
-	# 在headless模式下自动选择第一张卡牌（保护get_tree为空的情况）
-	if DisplayServer.get_name() == "headless":
-		var tree = get_tree()
-		if tree:
-			await tree.create_timer(1.0).timeout
-		if available_cards.size() > 0:
-			_select_card(available_cards[0])
-		else:
-			print("[CardSelection] ERROR: No cards available for auto-selection")
-			_on_close_button_pressed()
+	# 在无头模式下不再自动选择，交由测试或控制器驱动
+	if _is_headless_mode():
+		print("[CardSelection] Headless 模式下不自动选择卡牌（交由测试驱动）")
 
 func hide_selection():
 	"""隐藏选择窗口"""
@@ -118,10 +134,10 @@ func _update_card_display():
 
 	if available_cards.size() >= 1:
 		if card1_name:
-			card1_name.text = available_cards[0].name
+			card1_name.text = available_cards[0].get("name", "未知")
 		var price1 = _get_card_price(available_cards[0])
 		if card1_description:
-			card1_description.text = available_cards[0].description + "\n价格: " + str(price1) + " 灵石"
+			card1_description.text = available_cards[0].get("description", "") + "\n价格: " + str(price1) + " 灵石"
 		if card1_button:
 			card1_button.text = "购买(" + str(price1) + ")"
 			card1_button.disabled = stones < price1
@@ -138,10 +154,10 @@ func _update_card_display():
 
 	if available_cards.size() >= 2:
 		if card2_name:
-			card2_name.text = available_cards[1].name
+			card2_name.text = available_cards[1].get("name", "未知")
 		var price2 = _get_card_price(available_cards[1])
 		if card2_description:
-			card2_description.text = available_cards[1].description + "\n价格: " + str(price2) + " 灵石"
+			card2_description.text = available_cards[1].get("description", "") + "\n价格: " + str(price2) + " 灵石"
 		if card2_button:
 			card2_button.text = "购买(" + str(price2) + ")"
 			card2_button.disabled = stones < price2
@@ -158,10 +174,10 @@ func _update_card_display():
 
 	if available_cards.size() >= 3:
 		if card3_name:
-			card3_name.text = available_cards[2].name
+			card3_name.text = available_cards[2].get("name", "未知")
 		var price3 = _get_card_price(available_cards[2])
 		if card3_description:
-			card3_description.text = available_cards[2].description + "\n价格: " + str(price3) + " 灵石"
+			card3_description.text = available_cards[2].get("description", "") + "\n价格: " + str(price3) + " 灵石"
 		if card3_button:
 			card3_button.text = "购买(" + str(price3) + ")"
 			card3_button.disabled = stones < price3
@@ -213,10 +229,12 @@ func _test_card_manager():
 			print("[CardSelectionWindow] ERROR: 获取卡牌失败: ", card_id)
 
 func _select_card(card_data: Dictionary):
-	"""选择卡牌"""
+	print("[CardSelection] _select_card called with card: ", card_data.get("name", "UNKNOWN"))
+
 	# 购买扣费
 	var gm = _get_game_manager()
 	var price = _get_card_price(card_data)
+	print("[CardSelection] GameManager found: ", gm != null, ", price: ", price)
 	if gm:
 		if gm.spend_resources("spirit_stones", price):
 			# 从待选列表移除已购买卡牌
@@ -224,27 +242,39 @@ func _select_card(card_data: Dictionary):
 			# 购买后重置刷新计数（价格清零）
 			refresh_count = 0
 			# 发出选择信号并隐藏窗口以进行放置
+			print("[CardSelection] Emitting card_selected signal for: ", card_data.get("name", "UNKNOWN"))
 			card_selected.emit(card_data)
 			hide_selection()
-			# Headless 环境下，直接视为选择窗口关闭以恢复移动
-			if DisplayServer.get_name() == "headless":
+			
+			# 检查是否是地形卡牌
+			var is_terrain_card = _is_terrain_card(card_data)
+			
+			# 对于地形卡牌，不立即发出selection_closed信号；等待放置或取消后再发出
+			if not is_terrain_card:
 				selection_closed.emit()
 			return
 		else:
-			print("[CardSelection] 灵石不足，无法购买: ", card_data.name)
-			if DisplayServer.get_name() == "headless":
+			print("[CardSelection] 灵石不足，无法购买: ", card_data.get("name", "UNKNOWN"))
+			if _is_headless_mode():
 				print("[CardSelection] Headless模式下忽略购买消耗，直接选择用于自动化测试")
 				_remove_selected_card(card_data)
+				print("[CardSelection] Emitting card_selected signal in headless mode for: ", card_data.get("name", "UNKNOWN"))
 				card_selected.emit(card_data)
-				hide_selection()
-				selection_closed.emit()
+				# 在headless模式下不关闭选择窗口，继续连续选择
+				continue_selection()
 				return
 	else:
 		print("[CardSelection] 未找到GameManager，直接选择（测试模式）")
 		_remove_selected_card(card_data)
+		print("[CardSelection] Emitting card_selected signal in test mode for: ", card_data.get("name", "UNKNOWN"))
 		card_selected.emit(card_data)
 		hide_selection()
-		if DisplayServer.get_name() == "headless":
+		
+		# 检查是否是地形卡牌
+		var is_terrain_card = _is_terrain_card(card_data)
+		
+		# 对于地形卡牌，不立即发出selection_closed信号
+		if not is_terrain_card:
 			selection_closed.emit()
 
 func _remove_selected_card(selected: Dictionary):
@@ -261,6 +291,8 @@ func _remove_selected_card(selected: Dictionary):
 func continue_selection():
 	"""继续购买剩余卡牌：若仍有卡牌则重新显示窗口，否则视为关闭"""
 	if available_cards.size() > 0:
+		# 发出重新开始选择信号，通知MainGameController暂停英雄移动
+		selection_restarted.emit()
 		_update_card_display()
 		visible = true
 		_update_prices_and_buttons()
@@ -347,3 +379,13 @@ func _get_card_price(card_data: Dictionary) -> int:
 	if cm and cm.has_method("get_card_price"):
 		return cm.get_card_price(card_data)
 	return 10
+
+func _is_terrain_card(card_data: Dictionary) -> bool:
+	"""判断卡牌是否是地形卡牌"""
+	var card_type = card_data.get("type", null)
+	if typeof(card_type) == TYPE_STRING:
+		return card_type == "terrain"
+	elif typeof(card_type) == TYPE_INT:
+		# 直接比较CardManager.CardType.TERRAIN的值（值为1）
+		return card_type == 1
+	return false
