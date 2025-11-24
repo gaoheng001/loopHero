@@ -40,6 +40,11 @@ var team_attack_played_by_side: Dictionary = {}
 var last_damage_animation_time: Dictionary = {}
 var damage_animation_cooldown: float = 0.3  # 同一方受击动画冷却时间
 
+# 回合开始动画状态记录（用于技能触发时的安全复位）
+var turn_start_tween_by_side := {"heroes": null, "enemies": null}
+var turn_start_original_pos_by_side := {"heroes": Vector2.ZERO, "enemies": Vector2.ZERO}
+var turn_start_original_modulate_by_side := {"heroes": Color(1, 1, 1, 1), "enemies": Color(1, 1, 1, 1)}
+
 func _ready():
 	print("[BattleAnimationController] 动画控制器初始化")
 	_initialize_effects_manager()
@@ -261,8 +266,8 @@ func _play_damage_animation_immediate(animation_data: AnimationData, target_side
 		# 音效：只播放受击音效（施法音效已在技能触发时播放）
 		if audio_manager:
 			audio_manager.play_damage_sound(animation_data.damage, animation_data.is_critical, null)
-		# 复位技能标记，防止后续普通攻击仍被跳过
-		skill_triggered_by_side[attacker_side] = false
+		# 注意：不在此处复位技能标记，避免多段技能伤害导致队伍普攻误触发。
+		# 技能标记的复位改由回合开始或技能序列完全结束时处理。
 		return
 
 	# 普通攻击：播放队伍普攻动画，并在冲击时触发受击效果
@@ -306,6 +311,18 @@ func _on_skill_triggered(caster_data, skill_id: String, targets: Array):
 	# 标记本回合发生了技能（按阵营）
 	var caster_side = _get_side_for_member(caster_data)
 	skill_triggered_by_side[caster_side] = true
+	
+	# 安全处理：如果回合开始高亮仍在进行，立即停止并复位容器
+	var container = _get_animator_container_for_side(caster_side)
+	if container:
+		var tween = turn_start_tween_by_side.get(caster_side, null)
+		if tween != null:
+			print("[BAC][GUARD] 技能触发，终止回合开始高亮 | side=%s" % caster_side)
+			# 终止tween并复位容器状态
+			tween.kill()
+			turn_start_tween_by_side[caster_side] = null
+			container.position = turn_start_original_pos_by_side.get(caster_side, container.position)
+			container.modulate = turn_start_original_modulate_by_side.get(caster_side, container.modulate)
 	
 	var caster_animator = _find_character_animator(caster_data)
 	if caster_animator:
@@ -722,26 +739,23 @@ func play_battle_start_animation() -> void:
 	pass
 
 func play_turn_start_animation(turn_index: int) -> void:
-	# 简单的回合开始提示动画：让当前阵营的容器闪烁并轻微抖动
+	# 简单的回合开始提示动画：让当前阵营的容器纯高亮（无位移）
 	var side := current_acting_side if current_acting_side != "" else "heroes"
 	var container = _get_animator_container_for_side(side)
 	if container == null:
 		return
-	var start_pos: Vector2 = container.position
-	var original_modulate: Color = container.modulate
+	# 记录原始状态
+	turn_start_original_pos_by_side[side] = container.position
+	turn_start_original_modulate_by_side[side] = container.modulate
 	# 根据动画速度缩放时长
 	var dur: float = 0.12 / max(animation_speed, 0.1)
+	# 单一tween：高亮后恢复（无位移）
 	var tween = create_tween()
-	# 颜色高亮
 	tween.tween_property(container, "modulate", Color(1.2, 1.2, 1.0, 1.0), dur)
-	# 轻微抖动
-	tween.tween_property(container, "position", start_pos + Vector2(12 * (1 if side == "heroes" else -1), 0), dur).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tween.tween_property(container, "position", start_pos, dur).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	# 恢复颜色
-	var tween2 = create_tween()
-	tween2.tween_property(container, "modulate", original_modulate, dur)
+	tween.tween_property(container, "modulate", turn_start_original_modulate_by_side[side], dur)
+	turn_start_tween_by_side[side] = tween
 	await tween.finished
-	await tween2.finished
+	turn_start_tween_by_side[side] = null
 
 # 测试函数 - 直接触发敌方攻击动画
 func test_enemy_attack_animation():
@@ -907,7 +921,13 @@ func _get_animator_container_for_side(side: String) -> Node:
 func play_team_attack_animation_with_timing(attacker_side: String, target_side: String, damage: int, is_critical: bool):
 	"""带时序控制的队伍攻击动画：攻击位移→受击闪烁→血条扣血"""
 	print("[BattleAnimationController] 播放带时序的队伍攻击动画: %s -> %s" % [attacker_side, target_side])
-	
+
+	# 安全卫士：如果该阵营在本回合触发了技能，禁止队伍普攻动画
+	if skill_triggered_by_side.has(attacker_side) and skill_triggered_by_side[attacker_side]:
+		var flag: bool = bool(skill_triggered_by_side.get(attacker_side, false))
+		print("[BAC][GUARD] 技能拦截队伍普攻 | side=%s | flag=%s | map=%s" % [attacker_side, str(flag), str(skill_triggered_by_side)])
+		return
+
 	# 获取攻击方动画器
 	var animators = hero_animators if attacker_side == "heroes" else enemy_animators
 	
@@ -940,9 +960,9 @@ func _start_attack_with_impact_timing(attacker_animator: Node, target_side: Stri
 	if attacker_animator.has_method("play_attack_animation"):
 		attacker_animator.play_attack_animation()
 		
-		# 设置定时器在冲击时触发受击效果
+		# 设置定时器在冲击时触发受击效果（Timer 仅触发一次，无需标志）
 		var impact_delay = 0.35  # 攻击动画到达冲击点的时间
-		get_tree().create_timer(impact_delay).timeout.connect(_on_attack_impact.bind(target_side, damage, is_critical), CONNECT_ONE_SHOT)
+		get_tree().create_timer(impact_delay).timeout.connect(_on_attack_impact.bind(target_side, damage, is_critical))
 
 func _on_attack_impact(target_side: String, damage: int, is_critical: bool):
 	"""攻击冲击时的回调函数"""
@@ -962,11 +982,18 @@ func _trigger_hit_effects_at_impact(target_side: String, damage: int, is_critica
 	
 	print("[BattleAnimationController] 受击效果触发完成: %s" % target_side)
 
+
 func play_team_attack_animation(side: String):
 	"""队伍普攻动画：所有队员同时播放攻击动画"""
 	print("[BattleAnimationController] 播放队伍普攻动画: %s" % side)
 	print("[BattleAnimationController] 当前英雄动画器数量: %d, 敌人动画器数量: %d" % [hero_animators.size(), enemy_animators.size()])
-	
+
+	# 安全卫士：如果该阵营在本回合触发了技能，禁止队伍普攻动画
+	if skill_triggered_by_side.has(side) and skill_triggered_by_side[side]:
+		var flag: bool = bool(skill_triggered_by_side.get(side, false))
+		print("[BAC][GUARD] 技能拦截队伍普攻 | side=%s | flag=%s | map=%s" % [side, str(flag), str(skill_triggered_by_side)])
+		return
+
 	# 获取对应阵营的所有动画器
 	var animators = hero_animators if side == "heroes" else enemy_animators
 	

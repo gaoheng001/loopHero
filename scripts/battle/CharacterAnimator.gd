@@ -16,6 +16,7 @@ var character_sprite: ColorRect
 var health_bar: ProgressBar
 var character_label: Label
 var status_icons_container: HBoxContainer
+var ziling_animated: AnimatedSprite2D
 
 # 伤害数字池引用
 var damage_number_pool: DamageNumberPool
@@ -55,6 +56,14 @@ func _setup_ui_components():
 		character_sprite.size = Vector2(80, 80)
 		# 不设置颜色，由initialize_character方法控制
 		add_child(character_sprite)
+
+	# 获取或创建紫菱 AnimatedSprite2D（在场景中为占位节点 ZilingAnimated）
+	ziling_animated = (get_node_or_null("ZilingAnimated") as AnimatedSprite2D)
+	if ziling_animated == null:
+		ziling_animated = AnimatedSprite2D.new()
+		ziling_animated.name = "ZilingAnimated"
+		ziling_animated.visible = false
+		add_child(ziling_animated)
 	
 	# 创建或获取血量条
 	health_bar = (get_node_or_null("HealthBar") as ProgressBar)
@@ -115,6 +124,76 @@ func _setup_default_appearance():
 		character_sprite.modulate = original_modulate
 		# 不设置颜色，完全由initialize_character方法控制
 
+func _use_ziling_visuals():
+	"""启用紫菱的 AnimatedSprite2D，并绑定 attack/idle 动画"""
+	if ziling_animated == null:
+		return
+
+	# 从 MainGame.tscn 中临时抽取紫菱的 SpriteFrames（包含 attack/idle）
+	var main_scene: PackedScene = load("res://scenes/MainGame.tscn")
+	if main_scene:
+		var temp_root = main_scene.instantiate()
+		var temp_sprite: AnimatedSprite2D = temp_root.get_node_or_null("Character_ziling/AnimatedSprite2D")
+		if temp_sprite and temp_sprite.sprite_frames:
+			ziling_animated.sprite_frames = temp_sprite.sprite_frames.duplicate(true)
+			ziling_animated.animation = "idle"
+			ziling_animated.autoplay = "idle"
+			ziling_animated.frame = 0
+			ziling_animated.visible = true
+			# 同步正式资源节点自身的展示属性，避免二次缩放
+			# 同时考虑父节点 Character_ziling 的缩放，得到有效缩放
+			var temp_parent: Node2D = temp_root.get_node_or_null("Character_ziling")
+			var effective_scale: Vector2 = temp_sprite.scale
+			if temp_parent:
+				effective_scale = Vector2(effective_scale.x * temp_parent.scale.x, effective_scale.y * temp_parent.scale.y)
+			ziling_animated.scale = effective_scale
+			ziling_animated.centered = temp_sprite.centered
+			ziling_animated.offset = temp_sprite.offset
+			# 根据容器尺寸自动缩放与定位，避免因帧过大被裁剪
+			_fit_ziling_to_container()
+			# 隐藏原有 ColorRect，只使用紫菱动画显示
+			if character_sprite:
+				character_sprite.visible = false
+			# 清理临时实例
+			temp_root.queue_free()
+
+	print("[CharacterAnimator] 紫菱资源绑定完成：attack/idle 已就绪")
+
+func _fit_ziling_to_container():
+	"""将紫菱动画缩放到可视区域内，并进行居中与底对齐，避免裁剪"""
+	if ziling_animated == null or not ziling_animated.visible:
+		return
+
+	var target_size: Vector2 = Vector2(80, 80)
+	# 优先使用占位精灵尺寸；若占位不可见或不存在，则使用动画器自身尺寸
+	if character_sprite and character_sprite.visible:
+		# 使用占位精灵的尺寸作为期望显示区域
+		target_size = character_sprite.size
+	else:
+		target_size = size
+
+	var tex: Texture2D = null
+	if ziling_animated.sprite_frames:
+		if ziling_animated.sprite_frames.has_animation("idle"):
+			tex = ziling_animated.sprite_frames.get_frame_texture("idle", 0)
+		else:
+			var names := ziling_animated.sprite_frames.get_animation_names()
+			if names.size() > 0:
+				tex = ziling_animated.sprite_frames.get_frame_texture(names[0], 0)
+
+	if tex:
+		var frame_size: Vector2 = tex.get_size()
+		# 不再在此处进行缩放，使用资源节点自身的缩放
+		var scale_vec: Vector2 = ziling_animated.scale
+		# 计算显示后的尺寸，并按 AnimatedSprite2D 的居中锚点对齐
+		# 注意：AnimatedSprite2D 默认 centered=true，position 表示精灵中心点
+		# 底部居中应当将中心点放在 (target_width*0.5, target_height - drawn_height*0.5)
+		ziling_animated.centered = true
+		var drawn_size: Vector2 = Vector2(frame_size.x * scale_vec.x, frame_size.y * scale_vec.y)
+		var pos_x: float = target_size.x * 0.5
+		var pos_y: float = target_size.y - drawn_size.y * 0.5
+		ziling_animated.position = Vector2(pos_x, pos_y)
+
 func _setup_damage_number_pool():
 	"""设置伤害数字池"""
 	damage_number_pool = DamageNumberPool.new()
@@ -163,6 +242,10 @@ func initialize_character(char_data: Dictionary, team: String, pos: int):
 		print("[CharacterAnimator] 精灵状态: 位置=%s, 尺寸=%s, 颜色=%s, 可见=%s" % [
 			character_sprite.position, character_sprite.size, character_sprite.color, character_sprite.visible
 		])
+
+	# 如果角色为紫菱，切换为 AnimatedSprite2D 显示（使用 attack/idle）
+	if _get_character_name() == "紫菱":
+		_use_ziling_visuals()
 
 func mirror_for_enemy_layout():
 	"""为敌方角色应用简化的镜像布局"""
@@ -252,6 +335,10 @@ func play_attack_animation():
 	
 	current_animation = "attack"
 	print("[CharacterAnimator] 播放增强攻击动画: %s" % _get_character_name())
+
+	# 若为紫菱显示，先播放 attack 帧
+	if ziling_animated and ziling_animated.visible and ziling_animated.sprite_frames and ziling_animated.sprite_frames.has_animation("attack"):
+		ziling_animated.play("attack")
 	
 	# 增加移动距离，使动画更明显
 	var move_distance = 120  # 从60增加到120
@@ -316,6 +403,10 @@ func play_attack_animation():
 	return_tween.tween_property(character_sprite, "scale", original_scale, 0.3 / animation_speed).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	
 	await return_tween.finished
+
+	# 紫菱动画回到 idle
+	if ziling_animated and ziling_animated.visible and ziling_animated.sprite_frames and ziling_animated.sprite_frames.has_animation("idle"):
+		ziling_animated.play("idle")
 	
 	current_animation = ""
 	emit_signal("animation_completed", "attack")
@@ -490,19 +581,29 @@ func play_skill_animation(skill_id: String):
 	"""播放技能动画"""
 	if current_animation != "":
 		return
-	
+
 	current_animation = "skill"
 	print("[CharacterAnimator] 播放技能动画: %s 使用 %s" % [_get_character_name(), skill_id])
-	
+
+	# 技能开始：紫菱统一播放 attack 帧
+	if ziling_animated and ziling_animated.visible and ziling_animated.sprite_frames and ziling_animated.sprite_frames.has_animation("attack"):
+		ziling_animated.play("attack")
+
 	# 根据技能类型播放不同动画
 	match skill_id:
+		"skill.hero.wanjian_guizong.v1":
+			await _play_wanjian_guizong_animation()
 		"power_strike":
 			await _play_power_strike_animation()
 		"multi_strike":
 			await _play_multi_strike_animation()
 		_:
 			await _play_default_skill_animation()
-	
+
+	# 技能结束：紫菱回到 idle 帧
+	if ziling_animated and ziling_animated.visible and ziling_animated.sprite_frames and ziling_animated.sprite_frames.has_animation("idle"):
+		ziling_animated.play("idle")
+
 	current_animation = ""
 	emit_signal("animation_completed", "skill")
 
@@ -551,6 +652,57 @@ func _play_multi_strike_animation():
 		var interval_timer = create_tween()
 		interval_timer.tween_interval(0.1 / animation_speed)
 		await interval_timer.finished
+
+func _play_wanjian_guizong_vfx_boost():
+	"""万剑归宗的额外视觉增强（短暂高亮与缩放脉冲）"""
+	var vfx_tween = create_tween()
+	vfx_tween.set_parallel(true)
+	vfx_tween.tween_property(character_sprite, "modulate", Color(2.2, 2.2, 2.2, 1.0), 0.08 / animation_speed)
+	vfx_tween.tween_property(character_sprite, "scale", Vector2(1.7, 1.3), 0.08 / animation_speed)
+	await vfx_tween.finished
+	var recover = create_tween()
+	recover.set_parallel(true)
+	recover.tween_property(character_sprite, "modulate", original_modulate, 0.18 / animation_speed)
+	recover.tween_property(character_sprite, "scale", original_scale, 0.18 / animation_speed)
+	await recover.finished
+
+func _play_wanjian_guizong_animation():
+	"""播放万剑归宗技能动画：更大的前冲位移与冲击感"""
+	# 蓄力：轻微后拉与发光
+	var is_enemy = (team_type != "hero")
+	var charge = create_tween()
+	charge.set_parallel(true)
+	var charge_x: float = character_sprite.position.x + (15 if is_enemy else -15)
+	charge.tween_property(character_sprite, "position:x", charge_x, 0.12 / animation_speed)
+	charge.tween_property(character_sprite, "modulate", Color(1.4, 1.3, 1.0, 1.0), 0.12 / animation_speed)
+	charge.tween_property(character_sprite, "scale", Vector2(1.05, 1.05), 0.12 / animation_speed)
+	await charge.finished
+
+	# 释放：更大的位移幅度（较普攻更突出）
+	var move_distance: float = 180.0  # 普攻120，这里提升到180以突出技能力量
+	var target_x: float = character_sprite.position.x + (move_distance if not is_enemy else -move_distance)
+	var surge = create_tween()
+	surge.set_parallel(true)
+	surge.tween_property(character_sprite, "position:x", target_x, 0.16 / animation_speed).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	surge.tween_property(character_sprite, "scale", Vector2(1.6, 1.4), 0.10 / animation_speed)
+	surge.tween_property(character_sprite, "modulate", Color(2.4, 2.2, 1.6, 1.0), 0.10 / animation_speed)
+	await surge.finished
+
+	# 冲击增强：短促的亮度与缩放脉冲
+	await _play_wanjian_guizong_vfx_boost()
+
+	# 短暂停顿增加冲击感
+	var pause = create_tween()
+	pause.tween_interval(0.10 / animation_speed)
+	await pause.finished
+
+	# 回位：平滑恢复到初始位置与外观
+	var back = create_tween()
+	back.set_parallel(true)
+	back.tween_property(character_sprite, "position:x", original_sprite_position.x, 0.28 / animation_speed).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	back.tween_property(character_sprite, "modulate", original_modulate, 0.28 / animation_speed)
+	back.tween_property(character_sprite, "scale", original_scale, 0.28 / animation_speed)
+	await back.finished
 
 func _play_default_skill_animation():
 	"""播放默认技能动画"""

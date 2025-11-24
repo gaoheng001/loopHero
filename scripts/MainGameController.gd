@@ -566,8 +566,12 @@ func _on_battle_started(enemy_data: Dictionary):
 	if battle_window and battle_window.has_method("show_team_battle"):
 		print("[MainGameController] Starting team battle via BattleWindow.show_team_battle")
 		var hero_stats = {}
-		if hero_manager and hero_manager.has_method("get_hero_stats"):
-			hero_stats = hero_manager.get_hero_stats()
+		if hero_manager:
+			if hero_manager.has_method("get_hero_stats"):
+				hero_stats = hero_manager.get_hero_stats()
+			elif hero_manager.has_method("get_stats"):
+				# 兼容旧接口：使用 HeroManager.get_stats()
+				hero_stats = hero_manager.get_stats()
 		var hero_roster := _build_team_roster_from_hero_stats(hero_stats)
 		var enemy_roster := _build_team_roster_from_enemy_data(enemy_data)
 		battle_window.show_team_battle(hero_roster, enemy_roster)
@@ -584,8 +588,12 @@ func _on_battle_started(enemy_data: Dictionary):
 			print("[MainGameController] Recheck show_team_battle after script bind:", battle_window.has_method("show_team_battle"))
 			if battle_window.has_method("show_team_battle"):
 				var hero_stats = {}
-				if hero_manager and hero_manager.has_method("get_hero_stats"):
-					hero_stats = hero_manager.get_hero_stats()
+				if hero_manager:
+					if hero_manager.has_method("get_hero_stats"):
+						hero_stats = hero_manager.get_hero_stats()
+					elif hero_manager.has_method("get_stats"):
+						# 兼容旧接口：使用 HeroManager.get_stats()
+						hero_stats = hero_manager.get_stats()
 				var hero_roster := _build_team_roster_from_hero_stats(hero_stats)
 				var enemy_roster := _build_team_roster_from_enemy_data(enemy_data)
 				battle_window.call_deferred("show_team_battle", hero_roster, enemy_roster)
@@ -599,14 +607,28 @@ func _on_battle_started(enemy_data: Dictionary):
 # 组装队伍：基于英雄属性构造3人小队
 func _build_team_roster_from_hero_stats(hs: Dictionary) -> Array:
 	var roster: Array = []
+	# 主力：紫菱（ID: 1001），根据文档注入属性与技能
 	var h0 := {
-		"name": String(hs.get("name", "英雄")),
-		"current_hp": int(hs.get("current_hp", hs.get("max_hp", 100))),
-		"max_hp": int(hs.get("max_hp", hs.get("current_hp", 100))),
-		"attack": int(hs.get("attack", 12)),
-		"defense": int(hs.get("defense", 4)),
-		"skills": ["power_strike"],
-		"passives": ["tough"],
+		"name": "紫菱",
+		"current_hp": 500,
+		"max_hp": 500,
+		"attack": 100,
+		"defense": 80,
+		"position": 0,
+		# 主动技能：万剑归宗（首回合几率*2、最大1次）
+		"skills": [
+			{
+				"id": "skill.hero.wanjian_guizong.v1",
+				"limit": 1,
+				"chance": 0.30,
+				"first_round_chance_multiplier": 2.0,
+				"rate": 0.50
+			}
+		],
+		# 被动技能：凝心决（技能暴击率+20%，全队普攻暴击率+10%）
+		"passives": [
+			{"id": "skill.hero.ningxin_jue.v1"}
+		],
 		"status_effects": []
 	}
 	var h1 := {
@@ -615,6 +637,7 @@ func _build_team_roster_from_hero_stats(hs: Dictionary) -> Array:
 		"max_hp": max(24, int(hs.get("max_hp", 100) * 0.7)),
 		"attack": int(hs.get("attack", 12)) - 1,
 		"defense": int(hs.get("defense", 4)),
+		"position": 1,
 		"skills": ["multi_strike"],
 		"passives": ["lifesteal"],
 		"status_effects": []
@@ -625,6 +648,7 @@ func _build_team_roster_from_hero_stats(hs: Dictionary) -> Array:
 		"max_hp": max(20, int(hs.get("max_hp", 100) * 0.6)),
 		"attack": int(hs.get("attack", 12)) + 1,
 		"defense": int(hs.get("defense", 4)) - 1,
+		"position": 2,
 		"skills": ["power_strike"],
 		"passives": ["berserk"],
 		"status_effects": []

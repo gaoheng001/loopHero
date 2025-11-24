@@ -264,7 +264,7 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 mouse_filter = 2
-clip_contents = true
+clip_contents = false
 z_index = 100
 
 [node name="HeroAnimators" type="Control" parent="BattlePanel/MainContainer/ContentContainer/BattleArea/AnimationArea"]
@@ -275,7 +275,7 @@ offset_top = 100.0
 offset_right = 250.0
 offset_bottom = 500.0
 mouse_filter = 2
-clip_contents = true
+clip_contents = false
 
 [node name="EnemyAnimators" type="Control" parent="BattlePanel/MainContainer/ContentContainer/BattleArea/AnimationArea"]
 layout_mode = 1
@@ -285,7 +285,7 @@ offset_top = 100.0
 offset_right = 620.0
 offset_bottom = 500.0
 mouse_filter = 2
-clip_contents = true
+clip_contents = false
 
 [node name="EffectsLayer" type="CanvasLayer" parent="BattlePanel"]
 layer = 1

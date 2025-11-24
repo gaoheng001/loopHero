@@ -1,6 +1,6 @@
-[gd_scene load_steps=2 format=3 uid="uid://d9xvn0ywqxqxs"]
+[gd_scene load_steps=2 format=3 uid="uid://fj02x2n6qu61"]
 
-[ext_resource type="Script" path="res://scripts/battle/BattleControls.gd" id="1_2hdqz"]
+[ext_resource type="Script" uid="uid://cde334dmpp5gr" path="res://scripts/battle/BattleControls.gd" id="1_2hdqz"]
 
 [node name="BattleControls" type="Control"]
 layout_mode = 3
@@ -11,7 +11,6 @@ script = ExtResource("1_2hdqz")
 
 [node name="ControlPanel" type="Panel" parent="."]
 layout_mode = 0
-anchors_preset = 0
 offset_left = 10.0
 offset_top = 10.0
 offset_right = 310.0
@@ -19,7 +18,6 @@ offset_bottom = 90.0
 
 [node name="SpeedLabel" type="Label" parent="ControlPanel"]
 layout_mode = 0
-anchors_preset = 0
 offset_left = 10.0
 offset_top = 10.0
 offset_right = 90.0
@@ -28,7 +26,6 @@ text = "速度: 1.0x"
 
 [node name="SpeedSlider" type="HSlider" parent="ControlPanel"]
 layout_mode = 0
-anchors_preset = 0
 offset_left = 100.0
 offset_top = 10.0
 offset_right = 280.0
@@ -40,7 +37,6 @@ value = 1.0
 
 [node name="PauseButton" type="Button" parent="ControlPanel"]
 layout_mode = 0
-anchors_preset = 0
 offset_left = 10.0
 offset_top = 40.0
 offset_right = 70.0
@@ -49,7 +45,6 @@ text = "暂停"
 
 [node name="AutoButton" type="Button" parent="ControlPanel"]
 layout_mode = 0
-anchors_preset = 0
 offset_left = 80.0
 offset_top = 40.0
 offset_right = 140.0
@@ -58,7 +53,6 @@ text = "自动"
 
 [node name="SkipButton" type="Button" parent="ControlPanel"]
 layout_mode = 0
-anchors_preset = 0
 offset_left = 150.0
 offset_top = 40.0
 offset_right = 210.0
@@ -67,7 +61,6 @@ text = "跳过"
 
 [node name="ExitButton" type="Button" parent="ControlPanel"]
 layout_mode = 0
-anchors_preset = 0
 offset_left = 220.0
 offset_top = 40.0
 offset_right = 280.0

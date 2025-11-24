@@ -1034,8 +1034,14 @@ func show_skill_shout(caster, skill_id: String):
 	var is_hero: bool = false
 	if team_battle_manager != null:
 		is_hero = _is_member_in_team(team_battle_manager.hero_team, caster)
-	var sprite = hero_sprite if is_hero else enemy_sprite
-	if sprite == null:
+	# 优先锚定到施法者动画器，而不是1v1静态sprite
+	var anchor_node: Node = null
+	if battle_animation_controller != null and battle_animation_controller.has_method("_find_character_animator"):
+		anchor_node = battle_animation_controller._find_character_animator(caster)
+	if anchor_node == null:
+		# 兜底：使用旧的1v1精灵位置
+		anchor_node = hero_sprite if is_hero else enemy_sprite
+	if anchor_node == null:
 		return
 	var shout_text := _get_skill_shout_text(skill_id)
 	var label := Label.new()
@@ -1046,7 +1052,7 @@ func show_skill_shout(caster, skill_id: String):
 	label.add_theme_constant_override("outline_size", 2)
 	label.modulate = Color(1, 1, 1, 0)
 	label.scale = Vector2(0.85, 0.85)
-	label.position = sprite.global_position + Vector2(0, -30)
+	label.position = anchor_node.global_position + Vector2(0, -30)
 	add_child(label)
 	var tween := create_tween()
 	# 进入动画：淡入 + 稍微放大
@@ -1066,7 +1072,17 @@ func _get_skill_shout_text(skill_id: String) -> String:
 			return "强击!"
 		"multi_strike":
 			return "连击!"
+		"skill.hero.wanjian_guizong.v1":
+			return "万剑归宗!"
 		_:
+			# 尝试从ID推断友好名称
+			var guess := skill_id
+			var idx := guess.rfind(".")
+			if idx != -1 and idx + 1 < guess.length():
+				guess = guess.substr(idx + 1, guess.length() - idx - 1)
+			guess = guess.replace("_", " ").strip_edges()
+			if guess != "":
+				return guess.capitalize() + "!"
 			return "技能!"
 
 func _is_member_in_team(team_array: Array, member) -> bool:
